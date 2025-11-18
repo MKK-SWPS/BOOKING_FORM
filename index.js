@@ -597,7 +597,7 @@ app.get('/', (req, res) => {
                 <div class="form-section">
                     <h2>Wybierz datę</h2>
                     <div class="date-picker-container">
-                      <div class="date-help" id="dateHelp">💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.</div>
+                        <div class="date-help" id="dateHelp">💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.</div>
                       <input type="date" id="datePicker" required aria-describedby="dateHelp" min="2025-11-24" max="2025-12-05">
                     </div>
                 </div>
@@ -732,7 +732,7 @@ app.get('/', (req, res) => {
                     }
 
                     if (dateHelp) {
-                      dateHelp.textContent = '💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę. Terminy dostępne od ' + formatDateForDisplay(data.minDate) + ' do ' + formatDateForDisplay(data.maxDate) + '.';
+                      dateHelp.textContent = '💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.';
                     }
 
                     renderTimeSlots();
