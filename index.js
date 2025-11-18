@@ -206,8 +206,7 @@ Plik ICS z wpisem kalendarza znajduje się w załączniku.`
           const sanitizedTime = booking.timeSlot.replace(/[^0-9]/g, '')
           attachments.push({
             filename: `rezerwacja-${booking.date}-${sanitizedTime || 'czas'}.ics`,
-            content: Buffer.from(icsValue, 'utf8').toString('base64'),
-            contentType: 'text/calendar'
+            content: Buffer.from(icsValue, 'utf8').toString('base64')
           })
         } else if (icsError) {
           console.error('Błąd generowania załącznika ICS:', icsError)
