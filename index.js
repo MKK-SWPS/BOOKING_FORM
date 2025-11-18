@@ -182,7 +182,7 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking Calendar</title>
+    <title>Rejestracja na Badanie w Lab SWPS</title>
     <style>
         * {
             box-sizing: border-box;
@@ -405,8 +405,8 @@ app.get('/', (req, res) => {
 <body>
     <div class="booking-container">
         <div class="booking-header">
-            <h1>📅 Book Your Time Slot</h1>
-            <p>Select an available time and fill in your details</p>
+            <h1>📅 Rejestracja na Badanie w Lab SWPS</h1>
+            <p>Wybierz dogodny termin i uzupełnij swoje dane</p>
         </div>
         
         <div class="booking-content">
@@ -414,7 +414,7 @@ app.get('/', (req, res) => {
             
             <form id="bookingForm">
                 <div class="form-section">
-                    <h2>Select Date</h2>
+                    <h2>Wybierz datę</h2>
                     <div class="date-picker-container">
                         <input type="date" id="datePicker" required>
                         <div class="date-help" id="dateHelp"></div>
@@ -422,7 +422,7 @@ app.get('/', (req, res) => {
                 </div>
                 
                 <div class="form-section">
-                    <h2>Select Time Slot</h2>
+                    <h2>Wybierz godzinę</h2>
                     <div id="timeSlotsContainer" class="loading">
                         Loading available time slots...
                     </div>
@@ -430,37 +430,37 @@ app.get('/', (req, res) => {
                 </div>
                 
                 <div class="form-section">
-                    <h2>Your Information</h2>
+                    <h2>Dane uczestnika</h2>
                     
                     <div class="form-group">
-                        <label for="name">Name <span class="required">*</span></label>
-                        <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+                      <label for="name">Imię i nazwisko <span class="required">*</span></label>
+                      <input type="text" id="name" name="name" placeholder="Wpisz imię i nazwisko" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="email">Email <span class="required">*</span></label>
-                        <input type="email" id="email" name="email" placeholder="your.email@example.com" required>
+                      <label for="email">Adres e-mail <span class="required">*</span></label>
+                      <input type="email" id="email" name="email" placeholder="twoj.email@przyklad.com" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="gender">Gender <span class="required">*</span></label>
+                      <label for="gender">Płeć <span class="required">*</span></label>
                         <select id="gender" name="gender" required>
-                            <option value="">Select your gender</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="non-binary">Non-binary</option>
-                            <option value="prefer-not-to-say">Prefer not to say</option>
+                        <option value="">Wybierz płeć</option>
+                        <option value="male">Mężczyzna</option>
+                        <option value="female">Kobieta</option>
+                        <option value="non-binary">Osoba niebinarna</option>
+                        <option value="prefer-not-to-say">Wolę nie podawać</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
-                        <label for="age">Age <span class="required">*</span></label>
-                      <input type="number" id="age" name="age" placeholder="Enter your age" min="18" max="120" required>
+                      <label for="age">Wiek <span class="required">*</span></label>
+                      <input type="number" id="age" name="age" placeholder="Podaj swój wiek" min="18" max="120" required>
                     </div>
                 </div>
                 
                 <button type="submit" class="submit-button" id="submitButton">
-                    Book Appointment
+                    Zarezerwuj termin
                 </button>
             </form>
         </div>
@@ -499,7 +499,7 @@ app.get('/', (req, res) => {
             const container = document.getElementById('timeSlotsContainer');
             if (!container) return;
             container.className = 'loading';
-            container.innerHTML = 'Loading available time slots...';
+          container.innerHTML = 'Ładowanie dostępnych terminów...';
         }
 
         function updateSubmitButtonState() {
@@ -540,13 +540,13 @@ app.get('/', (req, res) => {
                     }
 
                     if (dateHelp) {
-                        dateHelp.textContent = 'Appointments available ' + formatDateForDisplay(data.minDate) + ' to ' + formatDateForDisplay(data.maxDate) + '.';
+                        dateHelp.textContent = 'Terminy dostępne od ' + formatDateForDisplay(data.minDate) + ' do ' + formatDateForDisplay(data.maxDate) + '.';
                     }
 
                     renderTimeSlots();
                 } else {
-                    const errorMessage = data.error || 'Unable to load time slots.';
-                    showMessage('Error loading time slots: ' + errorMessage, 'error');
+                    const errorMessage = data.error || 'Nie udało się pobrać terminów.';
+                    showMessage('Błąd podczas ładowania terminów: ' + errorMessage, 'error');
                     const container = document.getElementById('timeSlotsContainer');
                     if (container) {
                         container.className = 'loading';
@@ -554,12 +554,12 @@ app.get('/', (req, res) => {
                     }
                 }
             } catch (error) {
-                showMessage('Failed to connect to server', 'error');
+                  showMessage('Nie udało się połączyć z serwerem', 'error');
                 console.error('Error:', error);
                 const container = document.getElementById('timeSlotsContainer');
                 if (container) {
                     container.className = 'loading';
-                    container.innerHTML = 'Unable to load time slots.';
+                    container.innerHTML = 'Nie udało się pobrać terminów.';
                 }
             }
         }
@@ -572,13 +572,13 @@ app.get('/', (req, res) => {
             container.className = 'time-slots';
 
             if (!selectedDate) {
-                container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Select a date to view available times.</p>';
+              container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Wybierz datę, aby zobaczyć dostępne godziny.</p>';
                 updateSubmitButtonState();
                 return;
             }
 
             if (availableSlots.length === 0) {
-                container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">All time slots are booked for ' + formatDateForDisplay(selectedDate) + '. Please choose another date.</p>';
+              container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Wszystkie godziny na ' + formatDateForDisplay(selectedDate) + ' są zajęte. Wybierz inny dzień.</p>';
                 updateSubmitButtonState();
                 return;
             }
@@ -644,12 +644,12 @@ app.get('/', (req, res) => {
             selectedDate = datePicker ? datePicker.value : null;
 
             if (!selectedDate) {
-                showMessage('Please select a date', 'error');
+                showMessage('Wybierz datę', 'error');
                 return;
             }
 
             if (!selectedTimeSlot) {
-                showMessage('Please select a time slot', 'error');
+                showMessage('Wybierz godzinę', 'error');
                 return;
             }
 
@@ -663,17 +663,17 @@ app.get('/', (req, res) => {
             const ageValue = ageInput ? ageInput.value : '';
 
             if (!isValidEmail(emailValue)) {
-              showMessage('Please enter a valid email address', 'error');
+              showMessage('Podaj poprawny adres e-mail', 'error');
               return;
             }
 
             if (!isValidAdultAge(ageValue)) {
-              showMessage('You must be at least 18 years old to book an appointment', 'error');
+              showMessage('Rezerwacji mogą dokonać wyłącznie osoby pełnoletnie (18+).', 'error');
               return;
             }
 
             submitButton.disabled = true;
-            submitButton.textContent = 'Booking...';
+            submitButton.textContent = 'Trwa rezerwacja...';
 
             const reservedTime = selectedTimeSlot;
             const reservedDate = selectedDate;
@@ -700,8 +700,8 @@ app.get('/', (req, res) => {
 
                 if (response.ok) {
                   let successText = data.replacedExistingBooking
-                    ? '🔁 Updated! Your appointment is now set for ' + formatDateForDisplay(reservedDate) + ' at ' + reservedTime + '. '
-                    : '✅ Success! Your appointment is booked for ' + formatDateForDisplay(reservedDate) + ' at ' + reservedTime + '. ';
+                    ? '🔁 Zaktualizowano! Twoja wizyta została ustawiona na ' + formatDateForDisplay(reservedDate) + ' o ' + reservedTime + '. '
+                    : '✅ Sukces! Twoja wizyta została zarezerwowana na ' + formatDateForDisplay(reservedDate) + ' o ' + reservedTime + '. ';
 
                   if (data.message) {
                     successText += data.message;
@@ -719,14 +719,14 @@ app.get('/', (req, res) => {
                         loadAvailableSlots(reservedDate);
                     }, 500);
                 } else {
-                    showMessage('Error: ' + (data.error || 'Unable to complete booking'), 'error');
+                  showMessage('Błąd: ' + (data.error || 'Nie udało się zrealizować rezerwacji'), 'error');
                 }
             } catch (error) {
-                showMessage('Failed to book appointment. Please try again.', 'error');
+                showMessage('Nie udało się zarezerwować wizyty. Spróbuj ponownie.', 'error');
                 console.error('Error:', error);
             } finally {
                 submitButton.disabled = false;
-                submitButton.textContent = 'Book Appointment';
+                submitButton.textContent = 'Zarezerwuj termin';
             }
         });
 
@@ -764,7 +764,7 @@ app.get('/available-slots', async (req, res) => {
     })
   } catch (error) {
     console.error('Error getting available slots:', error)
-    res.status(500).json({ error: 'Failed to load available time slots' })
+    res.status(500).json({ error: 'Nie udało się pobrać dostępnych terminów' })
   }
 })
 
@@ -776,25 +776,25 @@ app.post('/book', async (req, res) => {
     const { date, timeSlot, name, email, gender, age } = req.body
 
     if (!date || !timeSlot || !name || !email || !gender || (typeof age === 'undefined' || age === null)) {
-      return res.status(400).json({ error: 'All fields are required' })
+      return res.status(400).json({ error: 'Wszystkie pola są wymagane' })
     }
 
     if (!isValidBookingDate(date)) {
-      return res.status(400).json({ error: 'Invalid booking date' })
+      return res.status(400).json({ error: 'Nieprawidłowa data rezerwacji' })
     }
 
     if (!ALL_TIME_SLOTS.includes(timeSlot)) {
-      return res.status(400).json({ error: 'Invalid time slot' })
+      return res.status(400).json({ error: 'Nieprawidłowy termin' })
     }
 
     const trimmedEmail = typeof email === 'string' ? email.trim() : ''
     if (!isValidEmail(trimmedEmail)) {
-      return res.status(400).json({ error: 'Please provide a valid email address' })
+      return res.status(400).json({ error: 'Podaj prawidłowy adres e-mail' })
     }
 
     const parsedAge = parseInt(age, 10)
     if (Number.isNaN(parsedAge) || parsedAge < 18 || parsedAge > 120) {
-      return res.status(400).json({ error: 'Age must be 18 or older' })
+      return res.status(400).json({ error: 'Wiek musi wynosić co najmniej 18 lat' })
     }
 
     const bookings = await loadBookings()
@@ -815,7 +815,7 @@ app.post('/book', async (req, res) => {
     })
 
     if (slotBooked) {
-      return res.status(400).json({ error: 'This time slot has already been booked for the selected date' })
+      return res.status(400).json({ error: 'Ten termin jest już zarezerwowany na wybraną datę' })
     }
 
     const newBooking = {
@@ -849,8 +849,8 @@ app.post('/book', async (req, res) => {
     res.json({
       success: true,
       message: replacedBooking
-        ? 'Existing booking replaced with your latest details.'
-        : 'Booking created successfully.',
+        ? 'Poprzednia rezerwacja została zastąpiona nowymi danymi.'
+        : 'Rezerwacja została zapisana.',
       booking: newBooking,
       replacedExistingBooking: Boolean(replacedBooking)
     })
@@ -859,7 +859,7 @@ app.post('/book', async (req, res) => {
   } catch (error) {
     console.error('=== BOOKING ERROR ===')
     console.error('Error creating booking:', error)
-    res.status(500).json({ error: 'Failed to create booking' })
+    res.status(500).json({ error: 'Nie udało się zapisać rezerwacji' })
   }
 })
 
