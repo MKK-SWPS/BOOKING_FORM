@@ -68,6 +68,10 @@ function isValidBookingDate(dateStr) {
   return dateStr >= minDate && dateStr <= maxDate
 }
 
+function normalizeEmail(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
 async function ensureBookingsFile() {
   try {
     await fs.access(BOOKINGS_FILE)
@@ -735,7 +739,17 @@ app.post('/book', async (req, res) => {
 
     const bookings = await loadBookings()
 
-    const slotBooked = bookings.some(booking => {
+    const normalizedIncomingEmail = normalizeEmail(email)
+    let replacedBooking = null
+    const bookingsWithoutEmail = bookings.filter(existing => {
+      const matches = normalizeEmail(existing.email) === normalizedIncomingEmail
+      if (matches && !replacedBooking) {
+        replacedBooking = existing
+      }
+      return !matches
+    })
+
+    const slotBooked = bookingsWithoutEmail.some(booking => {
       const bookingDate = booking.date || (booking.timestamp ? toDateOnlyString(new Date(booking.timestamp)) : null)
       return bookingDate === date && booking.timeSlot === timeSlot
     })
@@ -757,18 +771,26 @@ app.post('/book', async (req, res) => {
 
     // Save the new booking
     if (kv) {
-      // For Vercel KV, save directly
+      // For Vercel KV, remove previous entry for this email (if any) and save directly
+      if (replacedBooking) {
+        try {
+          await kv.del(`booking:${replacedBooking.id}`)
+        } catch (error) {
+          console.error('Error removing previous booking from Vercel KV:', error)
+        }
+      }
       await kv.set(`booking:${newBooking.id}`, newBooking)
     } else {
-      // For file system, add to array and save
-      bookings.push(newBooking)
-      await saveBookings(bookings)
+      // For file system, replace existing entry (if any) then save
+      const finalBookings = [...bookingsWithoutEmail, newBooking]
+      await saveBookings(finalBookings)
     }
 
     res.json({
       success: true,
-      message: 'Booking confirmed',
-      booking: newBooking
+      message: replacedBooking ? 'Booking updated' : 'Booking confirmed',
+      booking: newBooking,
+      replacedExistingBooking: Boolean(replacedBooking)
     })
 
     console.log('=== BOOKING REQUEST END (SUCCESS) ===')
