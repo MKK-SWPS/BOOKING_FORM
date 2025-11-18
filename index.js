@@ -404,7 +404,7 @@ app.get('/', (req, res) => {
         .form-group select {
             width: 100%;
             padding: 12px;
-          background-color: #3a3a3a;
+          background-color: #4a4a4a;
             border: 1px solid #3d3d3d;
             border-radius: 8px;
             color: white;
@@ -430,11 +430,15 @@ app.get('/', (req, res) => {
         
         .date-picker-container input[type="date"] {
             padding: 12px;
-          background-color: #3a3a3a;
+          background-color: #4a4a4a;
             border: 1px solid #3d3d3d;
             border-radius: 8px;
             color: white;
             font-size: 14px;
+        }
+
+        .date-picker-container input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1);
         }
         
         .date-picker-container input[type="date"]:focus {
@@ -818,6 +822,20 @@ app.get('/', (req, res) => {
         }
 
         const datePickerElement = document.getElementById('datePicker');
+        const datePickerContainer = document.querySelector('.date-picker-container');
+
+        if (datePickerContainer && datePickerElement) {
+          datePickerContainer.addEventListener('click', function (event) {
+            if (event.target !== datePickerElement) {
+              if (typeof datePickerElement.showPicker === 'function') {
+                datePickerElement.showPicker();
+              } else {
+                datePickerElement.focus();
+              }
+            }
+          });
+        }
+
         if (datePickerElement) {
             datePickerElement.addEventListener('change', function (e) {
                 const newDate = e.target.value;
