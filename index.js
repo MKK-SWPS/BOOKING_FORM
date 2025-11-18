@@ -155,6 +155,7 @@ async function sendBookingNotification(booking, replacedBooking) {
         </tbody>
       </table>
       <p style="margin-top: 16px; font-size: 13px; color: #555;">ID rezerwacji: ${booking.id}</p>
+      <p style="margin-top: 12px; font-size: 13px; color: #555;">W załączniku znajduje się plik kalendarza (ICS) dla tej rezerwacji.</p>
     </div>
   `
 
@@ -166,7 +167,56 @@ Imię i nazwisko: ${booking.name}
 Adres e-mail: ${booking.email}
 Płeć: ${booking.gender}
 Wiek: ${booking.age}
-ID rezerwacji: ${booking.id}`
+ID rezerwacji: ${booking.id}
+
+Plik ICS z wpisem kalendarza znajduje się w załączniku.`
+
+  let attachments = []
+
+  try {
+    if (booking.date && booking.timeSlot) {
+      const [year, month, day] = booking.date.split('-').map(Number)
+      const [hour, minute] = booking.timeSlot.split(':').map(Number)
+
+      if (![year, month, day, hour, minute].some(Number.isNaN)) {
+        const summaryName = booking.name ? ` - ${booking.name}` : ''
+        const eventConfig = {
+          start: [year, month, day, hour, minute],
+          duration: { hours: 1 },
+          startInputType: 'local',
+          startOutputType: 'local',
+          title: `Badanie Lab SWPS${summaryName}`,
+          description: [
+            statusLine,
+            `Imię i nazwisko: ${booking.name || '-'}`,
+            `Adres e-mail: ${booking.email || '-'}`,
+            `Płeć: ${booking.gender || '-'}`,
+            `Wiek: ${typeof booking.age !== 'undefined' ? booking.age : '-'}`
+          ].join('\n'),
+          location: 'Lab SWPS',
+          productId: 'Lab SWPS Booking Calendar',
+          status: 'CONFIRMED',
+          calName: 'Rezerwacje Lab SWPS',
+          uid: `lab-swps-${booking.id}`
+        }
+
+        const { error: icsError, value: icsValue } = createEvents([eventConfig])
+
+        if (!icsError && icsValue) {
+          const sanitizedTime = booking.timeSlot.replace(/[^0-9]/g, '')
+          attachments.push({
+            filename: `rezerwacja-${booking.date}-${sanitizedTime || 'czas'}.ics`,
+            content: Buffer.from(icsValue, 'utf8').toString('base64'),
+            contentType: 'text/calendar'
+          })
+        } else if (icsError) {
+          console.error('Błąd generowania załącznika ICS:', icsError)
+        }
+      }
+    }
+  } catch (icsGenerationError) {
+    console.error('Błąd tworzenia załącznika ICS:', icsGenerationError)
+  }
 
   try {
     await resendClient.emails.send({
@@ -174,7 +224,8 @@ ID rezerwacji: ${booking.id}`
       to: notificationRecipients,
       subject,
       html: htmlBody,
-      text: textBody
+      text: textBody,
+      attachments: attachments.length > 0 ? attachments : undefined
     })
   } catch (error) {
     console.error('Błąd wysyłania powiadomienia e-mail:', error)
