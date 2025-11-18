@@ -404,7 +404,7 @@ app.get('/', (req, res) => {
         .form-group select {
             width: 100%;
             padding: 12px;
-            background-color: #2d2d2d;
+          background-color: #3a3a3a;
             border: 1px solid #3d3d3d;
             border-radius: 8px;
             color: white;
@@ -430,7 +430,7 @@ app.get('/', (req, res) => {
         
         .date-picker-container input[type="date"] {
             padding: 12px;
-            background-color: #2d2d2d;
+          background-color: #3a3a3a;
             border: 1px solid #3d3d3d;
             border-radius: 8px;
             color: white;
