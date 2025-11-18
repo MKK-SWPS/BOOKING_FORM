@@ -46,6 +46,7 @@ const BOOKINGS_DIR = path.join(__dirname, 'bookings')
 const BOOKINGS_FILE = path.join(BOOKINGS_DIR, 'all-bookings.json')
 
 const ALL_TIME_SLOTS = [
+  '08:00',
   '09:00',
   '10:00',
   '11:00',
@@ -54,10 +55,13 @@ const ALL_TIME_SLOTS = [
   '14:00',
   '15:00',
   '16:00',
-  '17:00'
+  '17:00',
+  '18:00',
+  '19:00'
 ]
 
-const MAX_BOOKING_DAYS = 30
+const MIN_BOOKING_DATE = '2025-11-24'
+const MAX_BOOKING_DATE = '2025-12-05'
 
 function toDateOnlyString(date) {
   const normalized = new Date(date)
@@ -66,12 +70,7 @@ function toDateOnlyString(date) {
 }
 
 function getDateBounds() {
-  const today = new Date()
-  const minDate = toDateOnlyString(today)
-  const maxDateObj = new Date(today)
-  maxDateObj.setDate(maxDateObj.getDate() + MAX_BOOKING_DAYS)
-  const maxDate = toDateOnlyString(maxDateObj)
-  return { minDate, maxDate }
+  return { minDate: MIN_BOOKING_DATE, maxDate: MAX_BOOKING_DATE }
 }
 
 function isValidBookingDate(dateStr) {
@@ -423,27 +422,28 @@ app.get('/', (req, res) => {
         }
         
         .date-picker-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
         }
-        
+
         .date-picker-container input[type="date"] {
-            padding: 12px;
+          padding: 12px;
           background-color: #4a4a4a;
-            border: 1px solid #3d3d3d;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
+          border: 1px solid #3d3d3d;
+          border-radius: 8px;
+          color: white;
+          font-size: 14px;
+          cursor: pointer;
         }
 
         .date-picker-container input[type="date"]::-webkit-calendar-picker-indicator {
           filter: invert(1);
         }
-        
+
         .date-picker-container input[type="date"]:focus {
-            outline: none;
-            border-color: #007aff;
+          outline: none;
+          border-color: #007aff;
         }
         
         .date-help {
@@ -597,8 +597,8 @@ app.get('/', (req, res) => {
                 <div class="form-section">
                     <h2>Wybierz datę</h2>
                     <div class="date-picker-container">
-                        <input type="date" id="datePicker" required>
-                        <div class="date-help" id="dateHelp"></div>
+                      <input type="date" id="datePicker" required aria-describedby="dateHelp" min="2025-11-24" max="2025-12-05">
+                      <div class="date-help" id="dateHelp">💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.</div>
                     </div>
                 </div>
                 
@@ -732,7 +732,7 @@ app.get('/', (req, res) => {
                     }
 
                     if (dateHelp) {
-                        dateHelp.textContent = 'Terminy dostępne od ' + formatDateForDisplay(data.minDate) + ' do ' + formatDateForDisplay(data.maxDate) + '.';
+                      dateHelp.textContent = 'Terminy dostępne od ' + formatDateForDisplay(data.minDate) + ' do ' + formatDateForDisplay(data.maxDate) + '. 💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.';
                     }
 
                     renderTimeSlots();
@@ -775,7 +775,7 @@ app.get('/', (req, res) => {
                 return;
             }
 
-            const allSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+            const allSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'];
 
             allSlots.forEach(slot => {
                 const slotDiv = document.createElement('div');
@@ -824,14 +824,67 @@ app.get('/', (req, res) => {
         const datePickerElement = document.getElementById('datePicker');
         const datePickerContainer = document.querySelector('.date-picker-container');
 
-        if (datePickerContainer && datePickerElement) {
-          datePickerContainer.addEventListener('click', function (event) {
-            if (event.target !== datePickerElement) {
-              if (typeof datePickerElement.showPicker === 'function') {
+        if (datePickerElement) {
+          let isOpeningPicker = false;
+
+          const openDatePicker = () => {
+            if (isOpeningPicker) {
+              return;
+            }
+
+            isOpeningPicker = true;
+
+            const finish = () => {
+              setTimeout(() => {
+                isOpeningPicker = false;
+              }, 50);
+            };
+
+            if (typeof datePickerElement.showPicker === 'function') {
+              try {
                 datePickerElement.showPicker();
-              } else {
-                datePickerElement.focus();
+                finish();
+                return;
+              } catch (pickerError) {
+                // Ignore and fall back to focus/click
               }
+            }
+
+            datePickerElement.focus({ preventScroll: true });
+            const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+            datePickerElement.dispatchEvent(clickEvent);
+            finish();
+          };
+
+          if (datePickerContainer) {
+            datePickerContainer.addEventListener('click', function (event) {
+              if (event.target !== datePickerElement) {
+                openDatePicker();
+              }
+            });
+          }
+
+          datePickerElement.addEventListener('mousedown', function (event) {
+            if (event.button === 0) {
+              event.preventDefault();
+              openDatePicker();
+            }
+          });
+
+          datePickerElement.addEventListener('click', function () {
+            openDatePicker();
+          });
+
+          ['focus', 'touchstart'].forEach(function (eventName) {
+            datePickerElement.addEventListener(eventName, function () {
+              openDatePicker();
+            });
+          });
+
+          datePickerElement.addEventListener('keydown', function (event) {
+            if (event.key === ' ' || event.key === 'Enter') {
+              event.preventDefault();
+              openDatePicker();
             }
           });
         }
