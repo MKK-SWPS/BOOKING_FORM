@@ -1,0 +1,8 @@
+node_modules/
+.vercel
+.env
+.env.*
+bookings/*.json
+feedback/*.json
+!bookings/.gitkeep
+!feedback/.gitkeep
