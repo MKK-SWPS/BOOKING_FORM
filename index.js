@@ -2,6 +2,7 @@ const express = require('express')
 const fs = require('fs').promises
 const path = require('path')
 const { Resend } = require('resend')
+const { createEvents } = require('ics')
 
 const app = express()
 const port = 3000
@@ -863,6 +864,90 @@ app.get('/available-slots', async (req, res) => {
   } catch (error) {
     console.error('Error getting available slots:', error)
     res.status(500).json({ error: 'Nie udało się pobrać dostępnych terminów' })
+  }
+})
+
+app.get('/calendar.ics', async (req, res) => {
+  try {
+    const bookings = await loadBookings()
+
+    if (!bookings || bookings.length === 0) {
+      return res.status(404).send('Brak rezerwacji do eksportu')
+    }
+
+    const sortedBookings = [...bookings].sort((a, b) => {
+      if (a.date === b.date) {
+        return a.timeSlot.localeCompare(b.timeSlot)
+      }
+      return a.date.localeCompare(b.date)
+    })
+
+    const events = []
+
+    for (const booking of sortedBookings) {
+      if (!booking.date || !booking.timeSlot) {
+        continue
+      }
+
+      const [year, month, day] = booking.date.split('-').map(Number)
+      const [hour, minute] = booking.timeSlot.split(':').map(Number)
+
+      if ([year, month, day, hour, minute].some(Number.isNaN)) {
+        continue
+      }
+
+      const titleName = booking.name ? ` - ${booking.name}` : ''
+      const summary = `Badanie Lab SWPS${titleName}`
+      const descriptionParts = [
+        `Data: ${booking.date}`,
+        `Godzina: ${booking.timeSlot}`
+      ]
+
+      if (booking.name) {
+        descriptionParts.push(`Imię i nazwisko: ${booking.name}`)
+      }
+      if (booking.email) {
+        descriptionParts.push(`E-mail: ${booking.email}`)
+      }
+      if (booking.gender) {
+        descriptionParts.push(`Płeć: ${booking.gender}`)
+      }
+      if (typeof booking.age !== 'undefined') {
+        descriptionParts.push(`Wiek: ${booking.age}`)
+      }
+
+      events.push({
+        start: [year, month, day, hour, minute],
+        duration: { hours: 1 },
+        startInputType: 'local',
+        startOutputType: 'local',
+        title: summary,
+        description: descriptionParts.join('\n'),
+        location: 'Lab SWPS',
+        productId: 'Lab SWPS Booking Calendar',
+        status: 'CONFIRMED',
+        calName: 'Rezerwacje Lab SWPS',
+        uid: `lab-swps-${booking.id || `${booking.date}-${booking.timeSlot}`}`
+      })
+    }
+
+    if (events.length === 0) {
+      return res.status(404).send('Brak poprawnych danych do wygenerowania kalendarza')
+    }
+
+    const { error, value } = createEvents(events)
+
+    if (error) {
+      console.error('Błąd generowania pliku ICS:', error)
+      return res.status(500).send('Nie udało się wygenerować kalendarza')
+    }
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="lab-swps-rezerwacje.ics"')
+    res.send(value)
+  } catch (error) {
+    console.error('Błąd tworzenia pliku ICS:', error)
+    res.status(500).send('Nie udało się wygenerować kalendarza')
   }
 })
 
