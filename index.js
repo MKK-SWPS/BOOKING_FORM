@@ -72,6 +72,16 @@ function normalizeEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
 }
 
+function isValidEmail(value) {
+  const trimmed = normalizeEmail(value)
+  if (!trimmed) {
+    return false
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(trimmed)
+}
+
 async function ensureBookingsFile() {
   try {
     await fs.access(BOOKINGS_FILE)
@@ -445,7 +455,7 @@ app.get('/', (req, res) => {
                     
                     <div class="form-group">
                         <label for="age">Age <span class="required">*</span></label>
-                        <input type="number" id="age" name="age" placeholder="Enter your age" min="1" max="120" required>
+                      <input type="number" id="age" name="age" placeholder="Enter your age" min="18" max="120" required>
                     </div>
                 </div>
                 
@@ -460,6 +470,25 @@ app.get('/', (req, res) => {
         let availableSlots = [];
         let selectedTimeSlot = null;
         let selectedDate = null;
+
+      function normalizeEmail(value) {
+        return typeof value === 'string' ? value.trim().toLowerCase() : '';
+      }
+
+      function isValidEmail(value) {
+        const trimmed = normalizeEmail(value);
+        if (!trimmed) {
+          return false;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(trimmed);
+      }
+
+      function isValidAdultAge(value) {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isInteger(parsed) && parsed >= 18 && parsed <= 120;
+      }
 
         function formatDateForDisplay(dateStr) {
             const date = new Date(dateStr + 'T00:00:00');
@@ -625,6 +654,24 @@ app.get('/', (req, res) => {
             }
 
             const submitButton = document.getElementById('submitButton');
+            const nameInput = document.getElementById('name');
+            const emailInput = document.getElementById('email');
+            const genderInput = document.getElementById('gender');
+            const ageInput = document.getElementById('age');
+
+            const emailValue = emailInput ? emailInput.value : '';
+            const ageValue = ageInput ? ageInput.value : '';
+
+            if (!isValidEmail(emailValue)) {
+              showMessage('Please enter a valid email address', 'error');
+              return;
+            }
+
+            if (!isValidAdultAge(ageValue)) {
+              showMessage('You must be at least 18 years old to book an appointment', 'error');
+              return;
+            }
+
             submitButton.disabled = true;
             submitButton.textContent = 'Booking...';
 
@@ -634,10 +681,10 @@ app.get('/', (req, res) => {
             const formData = {
                 date: reservedDate,
                 timeSlot: reservedTime,
-                name: document.getElementById('name').value,
-                email: document.getElementById('email').value,
-                gender: document.getElementById('gender').value,
-                age: parseInt(document.getElementById('age').value, 10)
+              name: nameInput ? nameInput.value : '',
+              email: emailValue.trim(),
+              gender: genderInput ? genderInput.value : '',
+              age: Number.parseInt(ageValue, 10)
             };
 
             try {
@@ -652,7 +699,15 @@ app.get('/', (req, res) => {
                 const data = await response.json();
 
                 if (response.ok) {
-                    showMessage('✅ Success! Your appointment is booked for ' + formatDateForDisplay(reservedDate) + ' at ' + reservedTime, 'success');
+                  let successText = data.replacedExistingBooking
+                    ? '🔁 Updated! Your appointment is now set for ' + formatDateForDisplay(reservedDate) + ' at ' + reservedTime + '. '
+                    : '✅ Success! Your appointment is booked for ' + formatDateForDisplay(reservedDate) + ' at ' + reservedTime + '. ';
+
+                  if (data.message) {
+                    successText += data.message;
+                  }
+
+                  showMessage(successText.trim(), 'success');
 
                     document.getElementById('name').value = '';
                     document.getElementById('email').value = '';
@@ -732,14 +787,19 @@ app.post('/book', async (req, res) => {
       return res.status(400).json({ error: 'Invalid time slot' })
     }
 
+    const trimmedEmail = typeof email === 'string' ? email.trim() : ''
+    if (!isValidEmail(trimmedEmail)) {
+      return res.status(400).json({ error: 'Please provide a valid email address' })
+    }
+
     const parsedAge = parseInt(age, 10)
-    if (Number.isNaN(parsedAge) || parsedAge < 1 || parsedAge > 120) {
-      return res.status(400).json({ error: 'Invalid age provided' })
+    if (Number.isNaN(parsedAge) || parsedAge < 18 || parsedAge > 120) {
+      return res.status(400).json({ error: 'Age must be 18 or older' })
     }
 
     const bookings = await loadBookings()
 
-    const normalizedIncomingEmail = normalizeEmail(email)
+    const normalizedIncomingEmail = normalizeEmail(trimmedEmail)
     let replacedBooking = null
     const bookingsWithoutEmail = bookings.filter(existing => {
       const matches = normalizeEmail(existing.email) === normalizedIncomingEmail
@@ -763,7 +823,7 @@ app.post('/book', async (req, res) => {
       date,
       timeSlot,
       name,
-      email,
+      email: trimmedEmail,
       gender,
       age: parsedAge,
       timestamp: new Date().toISOString()
@@ -788,7 +848,9 @@ app.post('/book', async (req, res) => {
 
     res.json({
       success: true,
-      message: replacedBooking ? 'Booking updated' : 'Booking confirmed',
+      message: replacedBooking
+        ? 'Existing booking replaced with your latest details.'
+        : 'Booking created successfully.',
       booking: newBooking,
       replacedExistingBooking: Boolean(replacedBooking)
     })
