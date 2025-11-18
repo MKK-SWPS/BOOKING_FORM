@@ -518,6 +518,34 @@ app.get('/', (req, res) => {
             font-size: 14px;
             animation: slideIn 0.3s ease-out;
         }
+
+        .consent-box {
+          background-color: #242424;
+          border: 1px solid #3d3d3d;
+          border-radius: 10px;
+          padding: 16px;
+          color: #d9d9d9;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .consent-text {
+          margin-bottom: 12px;
+        }
+
+        .consent-label {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-weight: 500;
+          font-size: 14px;
+        }
+
+        .consent-label input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          accent-color: #007aff;
+        }
         
         @keyframes slideIn {
             from {
@@ -607,6 +635,17 @@ app.get('/', (req, res) => {
                       <input type="number" id="age" name="age" placeholder="Podaj swój wiek" min="18" max="120" required>
                     </div>
                 </div>
+
+                  <div class="form-section">
+                    <div class="consent-box">
+                      <p class="consent-text">
+          Administratorem danych osobowych jest Uniwersytet SWPS z siedzibą przy ul. Chodakowskiej 19/31, 03-815 Warszawa. Dane będą przetwarzane w celu rejestracji i organizacji badania naukowego na podstawie udzielonej zgody (art. 6 ust. 1 lit. a RODO). Przysługuje prawo dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, przeniesienia, sprzeciwu oraz wycofania zgody w dowolnym momencie bez wpływu na zgodność z prawem przetwarzania przed wycofaniem zgody. Przysługuje także prawo wniesienia skargi do Prezesa UODO. Kontakt do Inspektora Ochrony Danych: iod@swps.edu.pl. Podanie danych jest dobrowolne, ale niezbędne do udziału w badaniu.
+                      </p>
+                      <label class="consent-label">
+                        <input type="checkbox" id="consentCheckbox" required> Zgoda na przetwarzanie danych osobowych — Wyrażam zgodę
+                      </label>
+                    </div>
+                  </div>
                 
                 <button type="submit" class="submit-button" id="submitButton">
                     Zarezerwuj termin
@@ -807,6 +846,7 @@ app.get('/', (req, res) => {
             const emailInput = document.getElementById('email');
             const genderInput = document.getElementById('gender');
             const ageInput = document.getElementById('age');
+            const consentCheckbox = document.getElementById('consentCheckbox');
 
             const emailValue = emailInput ? emailInput.value : '';
             const ageValue = ageInput ? ageInput.value : '';
@@ -818,6 +858,11 @@ app.get('/', (req, res) => {
 
             if (!isValidAdultAge(ageValue)) {
               showMessage('Rezerwacji mogą dokonać wyłącznie osoby pełnoletnie (18+).', 'error');
+              return;
+            }
+
+            if (!consentCheckbox || !consentCheckbox.checked) {
+              showMessage('Aby kontynuować, zaakceptuj przetwarzanie danych osobowych.', 'error');
               return;
             }
 
@@ -862,6 +907,9 @@ app.get('/', (req, res) => {
                     document.getElementById('email').value = '';
                     document.getElementById('gender').value = '';
                     document.getElementById('age').value = '';
+                    if (consentCheckbox) {
+                      consentCheckbox.checked = false;
+                    }
                     resetTimeSelection();
 
                     setTimeout(function () {
