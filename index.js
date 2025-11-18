@@ -1,6 +1,7 @@
 const express = require('express')
 const fs = require('fs').promises
 const path = require('path')
+const { Resend } = require('resend')
 
 const app = express()
 const port = 3000
@@ -20,6 +21,24 @@ if (useVercelKV) {
   }
 } else {
   console.log('Using file system for local development (set KV_REST_API_URL and KV_REST_API_TOKEN to use Vercel KV)')
+}
+
+let resendClient = null
+const notificationSender = (process.env.NOTIFY_EMAIL_FROM || '').trim()
+const notificationRecipients = (process.env.NOTIFY_EMAIL_TO || '')
+  .split(',')
+  .map(item => item.trim())
+  .filter(Boolean)
+
+if (process.env.RESEND_API_KEY && notificationSender && notificationRecipients.length > 0) {
+  try {
+    resendClient = new Resend(process.env.RESEND_API_KEY)
+    console.log('Powiadomienia e-mail dla rezerwacji są włączone')
+  } catch (error) {
+    console.error('Nie udało się zainicjować Resend:', error)
+  }
+} else {
+  console.log('Powiadomienia e-mail są wyłączone (brak RESEND_API_KEY, NOTIFY_EMAIL_FROM lub NOTIFY_EMAIL_TO)')
 }
 
 const BOOKINGS_DIR = path.join(__dirname, 'bookings')
@@ -80,6 +99,85 @@ function isValidEmail(value) {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(trimmed)
+}
+
+async function sendBookingNotification(booking, replacedBooking) {
+  if (!resendClient || !notificationSender || notificationRecipients.length === 0) {
+    return
+  }
+
+  const dateDisplay = new Date(`${booking.date}T00:00:00`).toLocaleDateString('pl-PL', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+
+  const subject = replacedBooking
+    ? `Aktualizacja rezerwacji: ${dateDisplay} ${booking.timeSlot}`
+    : `Nowa rezerwacja: ${dateDisplay} ${booking.timeSlot}`
+
+  const statusLine = replacedBooking
+    ? 'Uwaga: ta rezerwacja zastąpiła istniejący wpis dla tego adresu e-mail.'
+    : 'Nowa rezerwacja została dodana do bazy.'
+
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+      <h2 style="margin-bottom: 12px;">${replacedBooking ? 'Aktualizacja rezerwacji' : 'Nowa rezerwacja'}</h2>
+      <p style="margin: 0 0 16px;">${statusLine}</p>
+      <table cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
+        <tbody>
+          <tr>
+            <td style="font-weight: bold; padding-right: 16px;">Data</td>
+            <td>${dateDisplay}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; padding-right: 16px;">Godzina</td>
+            <td>${booking.timeSlot}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; padding-right: 16px;">Imię i nazwisko</td>
+            <td>${booking.name}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; padding-right: 16px;">Adres e-mail</td>
+            <td>${booking.email}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; padding-right: 16px;">Płeć</td>
+            <td>${booking.gender}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; padding-right: 16px;">Wiek</td>
+            <td>${booking.age}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin-top: 16px; font-size: 13px; color: #555;">ID rezerwacji: ${booking.id}</p>
+    </div>
+  `
+
+  const textBody = `${statusLine}
+
+Data: ${dateDisplay}
+Godzina: ${booking.timeSlot}
+Imię i nazwisko: ${booking.name}
+Adres e-mail: ${booking.email}
+Płeć: ${booking.gender}
+Wiek: ${booking.age}
+ID rezerwacji: ${booking.id}`
+
+  try {
+    await resendClient.emails.send({
+      from: notificationSender,
+      to: notificationRecipients,
+      subject,
+      html: htmlBody,
+      text: textBody
+    })
+  } catch (error) {
+    console.error('Błąd wysyłania powiadomienia e-mail:', error)
+  }
 }
 
 async function ensureBookingsFile() {
@@ -844,6 +942,11 @@ app.post('/book', async (req, res) => {
       // For file system, replace existing entry (if any) then save
       const finalBookings = [...bookingsWithoutEmail, newBooking]
       await saveBookings(finalBookings)
+    }
+
+    if (resendClient) {
+      // Fire-and-forget notification; we log errors inside the helper.
+      void sendBookingNotification(newBooking, replacedBooking)
     }
 
     res.json({
