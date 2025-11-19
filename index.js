@@ -756,7 +756,7 @@ app.get('/', (req, res) => {
           return false;
         }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
         return emailRegex.test(trimmed);
       }
 
