@@ -882,16 +882,20 @@ app.get('/', (req, res) => {
         }
 
         function showMessage(text, type) {
-          const successArea = document.getElementById('buttonMessageArea');
-          const defaultArea = document.getElementById('messageArea');
+          const bottomArea = document.getElementById('buttonMessageArea');
+          const fallbackArea = document.getElementById('messageArea');
+          const targetArea = bottomArea || fallbackArea;
 
-          if (type !== 'success' && successArea) {
-            successArea.innerHTML = '';
-          }
-
-          const targetArea = type === 'success' ? successArea : defaultArea;
           if (!targetArea) {
             return;
+          }
+
+          if (bottomArea && fallbackArea && fallbackArea !== targetArea) {
+            fallbackArea.innerHTML = '';
+          }
+
+          if (bottomArea) {
+            bottomArea.innerHTML = '';
           }
 
           const messageDiv = document.createElement('div');
