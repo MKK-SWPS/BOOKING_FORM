@@ -121,6 +121,13 @@ async function sendBookingNotification(booking, replacedBooking) {
     ? 'Uwaga: ta rezerwacja zastąpiła istniejący wpis dla tego adresu e-mail.'
     : 'Nowa rezerwacja została dodana do bazy.'
 
+  const nativeLanguageRow = typeof booking.nativePolishSpeaker !== 'undefined'
+    ? `<tr>
+            <td style="font-weight: bold; padding-right: 16px;">Polski jako język ojczysty</td>
+            <td>${booking.nativePolishSpeaker ? 'Tak' : 'Nie'}</td>
+          </tr>`
+    : ''
+
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
       <h2 style="margin-bottom: 12px;">${replacedBooking ? 'Aktualizacja rezerwacji' : 'Nowa rezerwacja'}</h2>
@@ -151,6 +158,7 @@ async function sendBookingNotification(booking, replacedBooking) {
             <td style="font-weight: bold; padding-right: 16px;">Wiek</td>
             <td>${booking.age}</td>
           </tr>
+          ${nativeLanguageRow}
         </tbody>
       </table>
       <p style="margin-top: 16px; font-size: 13px; color: #555;">ID rezerwacji: ${booking.id}</p>
@@ -421,6 +429,18 @@ app.get('/', (req, res) => {
             color: #666;
         }
         
+        .checkbox-group label {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: 0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+          width: auto;
+          accent-color: #007aff;
+        }
+        
         .date-picker-container {
           display: flex;
           flex-direction: column;
@@ -637,6 +657,13 @@ app.get('/', (req, res) => {
                     <div class="form-group">
                       <label for="age">Wiek <span class="required">*</span></label>
                       <input type="number" id="age" name="age" placeholder="Podaj swój wiek" min="18" max="120" required>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                      <label for="nativePolish">
+                        <input type="checkbox" id="nativePolish" name="nativePolish">
+                        Język polski jest moim pierwszym / ojczystym językiem
+                      </label>
                     </div>
                 </div>
 
@@ -918,6 +945,7 @@ app.get('/', (req, res) => {
             const genderInput = document.getElementById('gender');
             const ageInput = document.getElementById('age');
             const consentCheckbox = document.getElementById('consentCheckbox');
+            const nativePolishCheckbox = document.getElementById('nativePolish');
 
             const emailValue = emailInput ? emailInput.value : '';
             const ageValue = ageInput ? ageInput.value : '';
@@ -949,7 +977,8 @@ app.get('/', (req, res) => {
               name: nameInput ? nameInput.value : '',
               email: emailValue.trim(),
               gender: genderInput ? genderInput.value : '',
-              age: Number.parseInt(ageValue, 10)
+              age: Number.parseInt(ageValue, 10),
+              nativePolishSpeaker: nativePolishCheckbox ? nativePolishCheckbox.checked : false
             };
 
             try {
@@ -978,6 +1007,9 @@ app.get('/', (req, res) => {
                     document.getElementById('email').value = '';
                     document.getElementById('gender').value = '';
                     document.getElementById('age').value = '';
+                    if (nativePolishCheckbox) {
+                      nativePolishCheckbox.checked = false;
+                    }
                     if (consentCheckbox) {
                       consentCheckbox.checked = false;
                     }
@@ -1085,6 +1117,10 @@ app.get('/calendar.ics', async (req, res) => {
         descriptionParts.push(`Wiek: ${booking.age}`)
       }
 
+      if (typeof booking.nativePolishSpeaker !== 'undefined') {
+        descriptionParts.push(`Polski jako język ojczysty: ${booking.nativePolishSpeaker ? 'Tak' : 'Nie'}`)
+      }
+
       events.push({
         start: [year, month, day, hour, minute],
         duration: { hours: 1 },
@@ -1125,7 +1161,7 @@ app.post('/book', async (req, res) => {
   console.log('Incoming booking request received')
 
   try {
-    const { date, timeSlot, name, email, gender, age } = req.body
+    const { date, timeSlot, name, email, gender, age, nativePolishSpeaker } = req.body
 
     if (!date || !timeSlot || !name || !email || !gender || (typeof age === 'undefined' || age === null)) {
       return res.status(400).json({ error: 'Wszystkie pola są wymagane' })
@@ -1178,6 +1214,7 @@ app.post('/book', async (req, res) => {
       email: trimmedEmail,
       gender,
       age: parsedAge,
+      nativePolishSpeaker: Boolean(nativePolishSpeaker),
       timestamp: new Date().toISOString()
     }
 
