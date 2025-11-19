@@ -683,7 +683,7 @@ app.get('/', (req, res) => {
                     
                     <div class="form-group">
                       <label for="email">Adres e-mail <span class="required">*</span></label>
-                      <input type="email" id="email" name="email" placeholder="twoj.email@przyklad.com" required>
+                      <input type="text" id="email" name="email" placeholder="twoj.email@przyklad.com" required>
                     </div>
                     
                     <div class="form-group">
