@@ -60,6 +60,13 @@ const ALL_TIME_SLOTS = [
   '19:00'
 ]
 
+const ALLOWED_EDUCATION_LEVELS = new Set(['higher', 'studies', 'other'])
+const EDUCATION_LABELS = {
+  higher: 'wyższe',
+  studies: 'studiuję',
+  other: 'inne'
+}
+
 const MIN_BOOKING_DATE = '2025-11-24'
 const MAX_BOOKING_DATE = '2025-12-05'
 
@@ -121,6 +128,10 @@ async function sendBookingNotification(booking, replacedBooking) {
     ? 'Uwaga: ta rezerwacja zastąpiła istniejący wpis dla tego adresu e-mail.'
     : 'Nowa rezerwacja została dodana do bazy.'
 
+  const educationLabel = booking.education && EDUCATION_LABELS[booking.education]
+    ? EDUCATION_LABELS[booking.education]
+    : (booking.education || '—')
+
   const nativeLanguageRow = typeof booking.nativePolishSpeaker !== 'undefined'
     ? `<tr>
             <td style="font-weight: bold; padding-right: 16px;">Polski jako język ojczysty</td>
@@ -157,6 +168,10 @@ async function sendBookingNotification(booking, replacedBooking) {
           <tr>
             <td style="font-weight: bold; padding-right: 16px;">Wiek</td>
             <td>${booking.age}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; padding-right: 16px;">Wykształcenie</td>
+            <td>${educationLabel}</td>
           </tr>
           ${nativeLanguageRow}
         </tbody>
@@ -659,9 +674,19 @@ app.get('/', (req, res) => {
                       <input type="number" id="age" name="age" placeholder="Podaj swój wiek" min="18" max="120" required>
                     </div>
 
+                    <div class="form-group">
+                      <label for="education">Wykształcenie <span class="required">*</span></label>
+                      <select id="education" name="education" required>
+                        <option value="">Wybierz opcję</option>
+                        <option value="higher">wyższe</option>
+                        <option value="studies">studiuję</option>
+                        <option value="other">inne</option>
+                      </select>
+                    </div>
+
                     <div class="form-group checkbox-group">
                       <label for="nativePolish">
-                        <input type="checkbox" id="nativePolish" name="nativePolish">
+                        <input type="checkbox" id="nativePolish" name="nativePolish" required>
                         Język polski jest moim pierwszym / ojczystym językiem
                       </label>
                     </div>
@@ -944,6 +969,7 @@ app.get('/', (req, res) => {
             const emailInput = document.getElementById('email');
             const genderInput = document.getElementById('gender');
             const ageInput = document.getElementById('age');
+            const educationSelect = document.getElementById('education');
             const consentCheckbox = document.getElementById('consentCheckbox');
             const nativePolishCheckbox = document.getElementById('nativePolish');
 
@@ -960,8 +986,18 @@ app.get('/', (req, res) => {
               return;
             }
 
+            if (!educationSelect || !educationSelect.value) {
+              showMessage('Wybierz poziom wykształcenia.', 'error');
+              return;
+            }
+
             if (!consentCheckbox || !consentCheckbox.checked) {
               showMessage('Aby kontynuować, zaakceptuj przetwarzanie danych osobowych.', 'error');
+              return;
+            }
+
+            if (!nativePolishCheckbox || !nativePolishCheckbox.checked) {
+              showMessage('Potwierdź, że język polski jest Twoim pierwszym językiem.', 'error');
               return;
             }
 
@@ -978,6 +1014,7 @@ app.get('/', (req, res) => {
               email: emailValue.trim(),
               gender: genderInput ? genderInput.value : '',
               age: Number.parseInt(ageValue, 10),
+              education: educationSelect ? educationSelect.value : '',
               nativePolishSpeaker: nativePolishCheckbox ? nativePolishCheckbox.checked : false
             };
 
@@ -1007,6 +1044,9 @@ app.get('/', (req, res) => {
                     document.getElementById('email').value = '';
                     document.getElementById('gender').value = '';
                     document.getElementById('age').value = '';
+                    if (educationSelect) {
+                      educationSelect.value = '';
+                    }
                     if (nativePolishCheckbox) {
                       nativePolishCheckbox.checked = false;
                     }
@@ -1117,6 +1157,11 @@ app.get('/calendar.ics', async (req, res) => {
         descriptionParts.push(`Wiek: ${booking.age}`)
       }
 
+      if (booking.education) {
+        const educationLabel = EDUCATION_LABELS[booking.education] || booking.education
+        descriptionParts.push(`Wykształcenie: ${educationLabel}`)
+      }
+
       if (typeof booking.nativePolishSpeaker !== 'undefined') {
         descriptionParts.push(`Polski jako język ojczysty: ${booking.nativePolishSpeaker ? 'Tak' : 'Nie'}`)
       }
@@ -1161,9 +1206,9 @@ app.post('/book', async (req, res) => {
   console.log('Incoming booking request received')
 
   try {
-    const { date, timeSlot, name, email, gender, age, nativePolishSpeaker } = req.body
+    const { date, timeSlot, name, email, gender, age, education, nativePolishSpeaker } = req.body
 
-    if (!date || !timeSlot || !name || !email || !gender || (typeof age === 'undefined' || age === null)) {
+    if (!date || !timeSlot || !name || !email || !gender || !education || (typeof age === 'undefined' || age === null)) {
       return res.status(400).json({ error: 'Wszystkie pola są wymagane' })
     }
 
@@ -1183,6 +1228,14 @@ app.post('/book', async (req, res) => {
     const parsedAge = parseInt(age, 10)
     if (Number.isNaN(parsedAge) || parsedAge < 18 || parsedAge > 120) {
       return res.status(400).json({ error: 'Wiek musi wynosić co najmniej 18 lat' })
+    }
+
+    if (!ALLOWED_EDUCATION_LEVELS.has(education)) {
+      return res.status(400).json({ error: 'Podano nieprawidłową wartość dla wykształcenia' })
+    }
+
+    if (!nativePolishSpeaker) {
+      return res.status(400).json({ error: 'Rezerwacja dostępna wyłącznie dla osób, dla których polski jest językiem ojczystym.' })
     }
 
     const bookings = await loadBookings()
@@ -1214,6 +1267,7 @@ app.post('/book', async (req, res) => {
       email: trimmedEmail,
       gender,
       age: parsedAge,
+      education,
       nativePolishSpeaker: Boolean(nativePolishSpeaker),
       timestamp: new Date().toISOString()
     }
