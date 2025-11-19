@@ -26,10 +26,17 @@ if (useVercelKV) {
 
 let resendClient = null
 const notificationSender = (process.env.NOTIFY_EMAIL_FROM || '').trim()
-const notificationRecipients = (process.env.NOTIFY_EMAIL_TO || '')
+const rawNotificationRecipients = (process.env.NOTIFY_EMAIL_TO || '')
   .split(',')
   .map(item => item.trim())
   .filter(Boolean)
+
+const primaryNotificationRecipient = rawNotificationRecipients[0] || ''
+const notificationRecipients = primaryNotificationRecipient ? [primaryNotificationRecipient] : []
+
+if (rawNotificationRecipients.length > 1) {
+  console.warn('Wykryto wiele adresów w NOTIFY_EMAIL_TO. Tylko pierwszy zweryfikowany adres będzie użyty do wysyłki powiadomień.')
+}
 
 if (process.env.RESEND_API_KEY && notificationSender && notificationRecipients.length > 0) {
   try {
