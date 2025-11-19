@@ -586,6 +586,27 @@ app.get('/', (req, res) => {
           accent-color: #007aff;
         }
         
+          #buttonMessageWrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 20px;
+          }
+        
+          #buttonMessageArea {
+            width: 100%;
+          }
+
+        #buttonMessageArea:empty {
+          display: none;
+        }
+
+          #buttonMessageWrapper .message {
+            margin: 0;
+            width: 100%;
+          }
+        
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -703,9 +724,12 @@ app.get('/', (req, res) => {
                     </div>
                   </div>
                 
-                <button type="submit" class="submit-button" id="submitButton">
+                <div id="buttonMessageWrapper">
+                  <button type="submit" class="submit-button" id="submitButton">
                     Zarezerwuj termin
-                </button>
+                  </button>
+                  <div id="buttonMessageArea" role="status" aria-live="polite"></div>
+                </div>
             </form>
         </div>
     </div>
@@ -858,19 +882,32 @@ app.get('/', (req, res) => {
         }
 
         function showMessage(text, type) {
-            const messageArea = document.getElementById('messageArea');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message ' + type;
-            messageDiv.textContent = text;
+          const successArea = document.getElementById('buttonMessageArea');
+          const defaultArea = document.getElementById('messageArea');
 
-            messageArea.innerHTML = '';
-            messageArea.appendChild(messageDiv);
+          if (type !== 'success' && successArea) {
+            successArea.innerHTML = '';
+          }
 
-            if (type === 'success') {
-                setTimeout(function () {
-                    messageDiv.remove();
-                }, 5000);
-            }
+          const targetArea = type === 'success' ? successArea : defaultArea;
+          if (!targetArea) {
+            return;
+          }
+
+          const messageDiv = document.createElement('div');
+          messageDiv.className = 'message ' + type;
+          messageDiv.textContent = text;
+
+          targetArea.innerHTML = '';
+          targetArea.appendChild(messageDiv);
+
+          if (type !== 'success') {
+            setTimeout(function () {
+              if (messageDiv.parentElement === targetArea) {
+                messageDiv.remove();
+              }
+            }, 5000);
+          }
         }
 
         const datePickerElement = document.getElementById('datePicker');
