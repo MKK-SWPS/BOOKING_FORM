@@ -74,6 +74,8 @@ const EDUCATION_LABELS = {
   other: 'inne'
 }
 
+const MAX_TOTAL_BOOKINGS = 30
+
 const MIN_BOOKING_DATE = '2025-11-24'
 const MAX_BOOKING_DATE = '2025-12-05'
 
@@ -1305,6 +1307,11 @@ app.post('/book', async (req, res) => {
 
     if (slotBooked) {
       return res.status(400).json({ error: 'Ten termin jest już zarezerwowany na wybraną datę' })
+    }
+
+    const projectedTotalBookings = bookingsWithoutEmail.length + 1
+    if (projectedTotalBookings > MAX_TOTAL_BOOKINGS) {
+      return res.status(400).json({ error: 'Osiągnięto maksymalną liczbę osób zapisanych na badanie.' })
     }
 
     const newBooking = {
