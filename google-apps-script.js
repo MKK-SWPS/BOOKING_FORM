@@ -347,6 +347,7 @@ function sendNotificationEmail(data, isUpdate, oldDate, oldTimeSlot) {
     '</div>'
   ].join('\n');
   
+  // Send to lab notification emails
   NOTIFY_EMAILS.forEach(function(emailAddr) {
     MailApp.sendEmail({
       to: emailAddr,
@@ -355,6 +356,9 @@ function sendNotificationEmail(data, isUpdate, oldDate, oldTimeSlot) {
       htmlBody: htmlBody
     });
   });
+  
+  // Send confirmation to the person who booked
+  sendBookerConfirmation(data, isUpdate, dateDisplay);
 }
 
 // ============ TEST FUNCTION ============
@@ -374,4 +378,73 @@ function testProcessBooking() {
   
   const result = processBooking(testData);
   console.log('Test result:', result);
+}
+
+// Send confirmation email to the person who made the booking
+function sendBookerConfirmation(data, isUpdate, dateDisplay) {
+  if (!data.email) {
+    return;
+  }
+  
+  const subject = isUpdate 
+    ? 'Potwierdzenie zmiany rezerwacji - Lab SWPS'
+    : 'Potwierdzenie rezerwacji - Lab SWPS';
+  
+  const greeting = data.name ? ('Cześć ' + data.name.split(' ')[0] + '!') : 'Cześć!';
+  
+  const body = [
+    greeting,
+    '',
+    isUpdate 
+      ? 'Twoja rezerwacja została zaktualizowana.'
+      : 'Dziękujemy za zapisanie się na badanie w Lab SWPS!',
+    '',
+    'Szczegóły wizyty:',
+    '📅 Data: ' + dateDisplay,
+    '🕐 Godzina: ' + data.timeSlot,
+    '📍 Miejsce: Lab SWPS',
+    '',
+    'Jeśli potrzebujesz zmienić termin, wejdź ponownie na stronę rejestracji i zapisz się używając tego samego adresu e-mail.',
+    '',
+    'Do zobaczenia!',
+    'Zespół Lab SWPS',
+    '',
+    '---',
+    'ID rezerwacji: ' + data.id
+  ].join('\n');
+  
+  const htmlBody = [
+    '<div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">',
+    '<div style="background-color: #007aff; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">',
+    '<h1 style="margin: 0;">📅 Lab SWPS</h1>',
+    '</div>',
+    '<div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">',
+    '<h2 style="color: #333;">' + greeting + '</h2>',
+    '<p style="color: #555;">' + (isUpdate ? 'Twoja rezerwacja została zaktualizowana.' : 'Dziękujemy za zapisanie się na badanie w Lab SWPS!') + '</p>',
+    '<div style="background-color: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #007aff;">',
+    '<h3 style="margin-top: 0; color: #007aff;">Szczegóły wizyty</h3>',
+    '<p style="margin: 10px 0;"><strong>📅 Data:</strong> ' + dateDisplay + '</p>',
+    '<p style="margin: 10px 0;"><strong>🕐 Godzina:</strong> ' + data.timeSlot + '</p>',
+    '<p style="margin: 10px 0;"><strong>📍 Miejsce:</strong> Lab SWPS</p>',
+    '</div>',
+    '<p style="color: #666; font-size: 14px;">Jeśli potrzebujesz zmienić termin, wejdź ponownie na stronę rejestracji i zapisz się używając tego samego adresu e-mail.</p>',
+    '<p style="color: #333; margin-top: 30px;">Do zobaczenia!<br><strong>Zespół Lab SWPS</strong></p>',
+    '<hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">',
+    '<p style="color: #999; font-size: 12px;">ID rezerwacji: ' + data.id + '</p>',
+    '</div>',
+    '</div>'
+  ].join('\n');
+  
+  try {
+    MailApp.sendEmail({
+      to: data.email,
+      subject: subject,
+      body: body,
+      htmlBody: htmlBody,
+      replyTo: NOTIFY_EMAILS[0] || 'eyelab@swps.edu.pl'
+    });
+    console.log('Confirmation email sent to: ' + data.email);
+  } catch (error) {
+    console.error('Failed to send confirmation to booker:', error);
+  }
 }
