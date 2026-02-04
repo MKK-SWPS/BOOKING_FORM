@@ -7,6 +7,9 @@ const { createEvents } = require('ics')
 const app = express()
 const port = 3000
 
+// Google Apps Script Web App URL for storing bookings
+const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || ''
+
 app.use(express.json())
 app.use(express.static('public'))
 
@@ -268,6 +271,36 @@ async function ensureBookingsFile() {
   } catch (error) {
     await fs.mkdir(BOOKINGS_DIR, { recursive: true })
     await fs.writeFile(BOOKINGS_FILE, '[]', 'utf8')
+  }
+}
+
+async function sendToGoogleSheet(booking) {
+  if (!GOOGLE_SCRIPT_URL) {
+    console.log('Google Script URL not configured, skipping Google Sheet sync')
+    return null
+  }
+
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(booking)
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      console.log('Booking synced to Google Sheet:', result.isUpdate ? 'updated' : 'new', result.bookingId)
+    } else {
+      console.error('Google Sheet sync failed:', result.error)
+    }
+
+    return result
+  } catch (error) {
+    console.error('Error sending to Google Sheet:', error)
+    return null
   }
 }
 
@@ -1344,8 +1377,11 @@ app.post('/book', async (req, res) => {
       await saveBookings(finalBookings)
     }
 
-    if (resendClient) {
-      // Fire-and-forget notification; we log errors inside the helper.
+    // Sync to Google Sheet (handles notifications + calendar)
+    if (GOOGLE_SCRIPT_URL) {
+      void sendToGoogleSheet(newBooking)
+    } else if (resendClient) {
+      // Fallback to Resend if Google Script not configured
       void sendBookingNotification(newBooking, replacedBooking)
     }
 
