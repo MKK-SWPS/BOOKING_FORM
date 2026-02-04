@@ -716,6 +716,10 @@ app.get('/', (req, res) => {
         let configuredDates = [];
         let selectedTimeSlot = null;
         let selectedDate = null;
+        let cachedBookedSlots = {};  // Cache: date -> booked slots
+        let cachedMinDate = null;
+        let cachedMaxDate = null;
+        let dayHoursConfig = {};  // Cache: date -> { startHour, endHour }
 
       function normalizeEmail(value) {
         return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -761,7 +765,42 @@ app.get('/', (req, res) => {
             document.querySelectorAll('.time-slot.selected').forEach(el => el.classList.remove('selected'));
         }
 
-        async function loadAvailableSlots(requestedDate) {
+        // Generate time slots for a given date based on config
+        function generateTimeSlotsForDate(dateStr) {
+            const config = dayHoursConfig[dateStr];
+            if (!config) return [];
+            const slots = [];
+            for (let hour = config.startHour; hour <= config.endHour; hour++) {
+                slots.push(hour.toString().padStart(2, '0') + ':00');
+            }
+            return slots;
+        }
+
+        // Update slots display using cached data (no server call)
+        function updateSlotsForDate(dateStr) {
+            resetTimeSelection();
+            selectedDate = dateStr;
+            
+            const datePicker = document.getElementById('datePicker');
+            if (datePicker) {
+                datePicker.value = dateStr;
+            }
+            
+            // Get slots for this date
+            allSlots = generateTimeSlotsForDate(dateStr);
+            const bookedSlots = cachedBookedSlots[dateStr] || [];
+            availableSlots = allSlots.filter(slot => !bookedSlots.includes(slot));
+            
+            renderTimeSlots();
+        }
+
+        async function loadAvailableSlots(requestedDate, forceRefresh) {
+            // If we have cached data and not forcing refresh, use local filtering
+            if (!forceRefresh && Object.keys(cachedBookedSlots).length > 0 && requestedDate) {
+                updateSlotsForDate(requestedDate);
+                return;
+            }
+            
             setLoadingState();
             resetTimeSelection();
             availableSlots = [];
@@ -780,6 +819,16 @@ app.get('/', (req, res) => {
                     availableSlots = data.availableSlots || [];
                     allSlots = data.allSlots || [];
                     configuredDates = data.configuredDates || [];
+                    
+                    // Cache the booked slots and config
+                    if (data.allBookedSlots) {
+                        cachedBookedSlots = data.allBookedSlots;
+                    }
+                    if (data.dayHoursConfig) {
+                        dayHoursConfig = data.dayHoursConfig;
+                    }
+                    cachedMinDate = data.minDate;
+                    cachedMaxDate = data.maxDate;
 
                     if (datePicker) {
                         datePicker.min = data.minDate;
@@ -1098,7 +1147,7 @@ app.get('/', (req, res) => {
                     resetTimeSelection();
 
                     setTimeout(function () {
-                        loadAvailableSlots(reservedDate);
+                        loadAvailableSlots(reservedDate, true);  // Force refresh after booking
                     }, 500);
                 } else {
                   showMessage('Błąd: ' + (data.error || 'Nie udało się zrealizować rezerwacji'), 'error');
@@ -1144,29 +1193,34 @@ app.get('/available-slots', async (req, res) => {
       bookings = []
     }
 
-    console.log('Loaded bookings:', bookings.length)
-    if (bookings.length > 0) {
-      console.log('Sample booking:', JSON.stringify(bookings[0]))
+    // Build a map of all booked slots by date
+    const allBookedSlots = {}
+    for (const booking of bookings) {
+      const bookingDate = booking.date || (booking.timestamp ? toDateOnlyString(new Date(booking.timestamp)) : null)
+      if (!bookingDate) continue
+      
+      // Normalize time slot format (handle "9:00" vs "09:00")
+      const slot = String(booking.timeSlot || '')
+      let normalizedSlot = slot
+      if (slot.match(/^\d{1,2}:\d{2}$/)) {
+        const [h, m] = slot.split(':')
+        normalizedSlot = `${h.padStart(2, '0')}:${m}`
+      }
+      
+      if (!allBookedSlots[bookingDate]) {
+        allBookedSlots[bookingDate] = []
+      }
+      allBookedSlots[bookingDate].push(normalizedSlot)
     }
 
-    const bookedSlots = bookings
-      .filter(booking => {
-        const bookingDate = booking.date || (booking.timestamp ? toDateOnlyString(new Date(booking.timestamp)) : null)
-        return bookingDate === date
-      })
-      .map(booking => {
-        // Normalize time slot format (handle "9:00" vs "09:00")
-        const slot = String(booking.timeSlot || '')
-        if (slot.match(/^\d{1,2}:\d{2}$/)) {
-          const [h, m] = slot.split(':')
-          return `${h.padStart(2, '0')}:${m}`
-        }
-        return slot
-      })
-
-    console.log(`Date: ${date}, Booked slots:`, bookedSlots)
+    const bookedSlots = allBookedSlots[date] || []
     const availableSlots = allSlotsForDate.filter(slot => !bookedSlots.includes(slot))
-    console.log('Available slots:', availableSlots)
+
+    // Build day hours config for client-side slot generation
+    const dayHoursConfig = {}
+    for (const day of BOOKING_CONFIG.days) {
+      dayHoursConfig[day.date] = { startHour: day.startHour, endHour: day.endHour }
+    }
 
     res.json({
       date,
@@ -1175,7 +1229,9 @@ app.get('/available-slots', async (req, res) => {
       configuredDates,
       allSlots: allSlotsForDate,
       availableSlots,
-      bookedSlots
+      bookedSlots,
+      allBookedSlots,  // Include all booked slots for client-side caching
+      dayHoursConfig   // Include hours config for each day
     })
   } catch (error) {
     console.error('Error getting available slots:', error)
