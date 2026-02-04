@@ -612,19 +612,6 @@ app.get('/', (req, res) => {
             50% { opacity: 0.4; }
         }
         
-        .loading-dots::after {
-            content: '';
-            animation: dots 1.5s steps(4, end) infinite;
-        }
-        
-        @keyframes dots {
-            0% { content: ''; }
-            25% { content: '.'; }
-            50% { content: '..'; }
-            75% { content: '...'; }
-            100% { content: ''; }
-        }
-        
         .required {
             color: #ff3b30;
         }
@@ -771,7 +758,7 @@ app.get('/', (req, res) => {
             const container = document.getElementById('timeSlotsContainer');
             if (!container) return;
             container.className = 'loading loading-animated';
-            container.innerHTML = '<span class="loading-dots">Ładowanie dostępnych terminów</span>';
+            container.innerHTML = 'Ładowanie dostępnych terminów';
         }
 
         function updateSubmitButtonState() {

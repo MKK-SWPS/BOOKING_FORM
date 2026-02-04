@@ -436,13 +436,27 @@ function sendBookerConfirmation(data, isUpdate, dateDisplay) {
   ].join('\n');
   
   try {
-    MailApp.sendEmail({
-      to: data.email,
-      subject: subject,
-      body: body,
-      htmlBody: htmlBody,
-      replyTo: NOTIFY_EMAILS[0] || 'eyelab@swps.edu.pl'
-    });
+    // Try to send from eyelab@swps.edu.pl alias if available
+    const aliases = GmailApp.getAliases();
+    const eyelabAlias = aliases.find(a => a.toLowerCase() === 'eyelab@swps.edu.pl');
+    
+    if (eyelabAlias) {
+      GmailApp.sendEmail(data.email, subject, body, {
+        htmlBody: htmlBody,
+        from: eyelabAlias,
+        name: 'Lab SWPS'
+      });
+    } else {
+      // Fallback: send from default account with replyTo
+      MailApp.sendEmail({
+        to: data.email,
+        subject: subject,
+        body: body,
+        htmlBody: htmlBody,
+        replyTo: 'eyelab@swps.edu.pl',
+        name: 'Lab SWPS'
+      });
+    }
     console.log('Confirmation email sent to: ' + data.email);
   } catch (error) {
     console.error('Failed to send confirmation to booker:', error);
