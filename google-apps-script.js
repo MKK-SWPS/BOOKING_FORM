@@ -179,9 +179,15 @@ function getAllBookings() {
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (row[0]) { // Has ID
+      // Handle date - could be Date object or string
+      let dateStr = row[1];
+      if (dateStr instanceof Date) {
+        dateStr = Utilities.formatDate(dateStr, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      }
+      
       bookings.push({
         id: row[0],
-        date: row[1],
+        date: dateStr,
         timeSlot: row[2],
         name: row[3],
         email: row[4],

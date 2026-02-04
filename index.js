@@ -222,10 +222,43 @@ async function sendToGoogleSheet(booking) {
 }
 
 async function loadBookings() {
-  // On Vercel, we can't use local filesystem - return empty
-  // All real data is in Google Sheets
+  // On Vercel, fetch from Google Sheets (the source of truth)
+  if (IS_VERCEL && GOOGLE_SCRIPT_URL) {
+    console.log('Vercel environment: fetching bookings from Google Sheets')
+    try {
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        console.error('Failed to fetch bookings from Google Sheets:', response.status)
+        return []
+      }
+      
+      const contentType = response.headers.get('content-type') || ''
+      if (!contentType.includes('application/json')) {
+        console.error('Google Sheets returned non-JSON for GET:', contentType)
+        return []
+      }
+      
+      const data = await response.json()
+      if (data.success && Array.isArray(data.bookings)) {
+        console.log(`Fetched ${data.bookings.length} bookings from Google Sheets`)
+        return data.bookings
+      }
+      
+      console.error('Unexpected response from Google Sheets:', data)
+      return []
+    } catch (error) {
+      console.error('Error fetching bookings from Google Sheets:', error.message)
+      return []
+    }
+  }
+  
+  // On Vercel without Google Sheets, return empty
   if (IS_VERCEL) {
-    console.log('Vercel environment: using Google Sheets as primary storage')
+    console.log('Vercel environment: no Google Sheets URL, returning empty')
     return []
   }
   
@@ -651,7 +684,7 @@ app.get('/', (req, res) => {
                     <div class="form-group checkbox-group">
                       <label for="noMedicalConditions">
                         <input type="checkbox" id="noMedicalConditions" name="noMedicalConditions" required>
-                        Nie mam padaczki fotogennej ani innych przeciwwskazań zdrowotnych do korzystania z komputera przez 30 minut
+                        Nie mam epilepsji fotogennej ani innych przeciwwskazań zdrowotnych do korzystania z komputera przez 30 minut
                       </label>
                     </div>
                 </div>
