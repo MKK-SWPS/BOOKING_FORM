@@ -185,10 +185,22 @@ function getAllBookings() {
         dateStr = Utilities.formatDate(dateStr, Session.getScriptTimeZone(), 'yyyy-MM-dd');
       }
       
+      // Handle timeSlot - could be Date object or string
+      let timeSlot = row[2];
+      if (timeSlot instanceof Date) {
+        timeSlot = Utilities.formatDate(timeSlot, Session.getScriptTimeZone(), 'HH:mm');
+      } else if (typeof timeSlot === 'string') {
+        // Normalize "9:00" to "09:00"
+        const match = timeSlot.match(/^(\d{1,2}):(\d{2})$/);
+        if (match) {
+          timeSlot = match[1].padStart(2, '0') + ':' + match[2];
+        }
+      }
+      
       bookings.push({
         id: row[0],
         date: dateStr,
-        timeSlot: row[2],
+        timeSlot: timeSlot,
         name: row[3],
         email: row[4],
         gender: row[5],

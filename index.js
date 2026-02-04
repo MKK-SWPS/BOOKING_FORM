@@ -1144,14 +1144,29 @@ app.get('/available-slots', async (req, res) => {
       bookings = []
     }
 
+    console.log('Loaded bookings:', bookings.length)
+    if (bookings.length > 0) {
+      console.log('Sample booking:', JSON.stringify(bookings[0]))
+    }
+
     const bookedSlots = bookings
       .filter(booking => {
         const bookingDate = booking.date || (booking.timestamp ? toDateOnlyString(new Date(booking.timestamp)) : null)
         return bookingDate === date
       })
-      .map(booking => booking.timeSlot)
+      .map(booking => {
+        // Normalize time slot format (handle "9:00" vs "09:00")
+        const slot = String(booking.timeSlot || '')
+        if (slot.match(/^\d{1,2}:\d{2}$/)) {
+          const [h, m] = slot.split(':')
+          return `${h.padStart(2, '0')}:${m}`
+        }
+        return slot
+      })
 
+    console.log(`Date: ${date}, Booked slots:`, bookedSlots)
     const availableSlots = allSlotsForDate.filter(slot => !bookedSlots.includes(slot))
+    console.log('Available slots:', availableSlots)
 
     res.json({
       date,
