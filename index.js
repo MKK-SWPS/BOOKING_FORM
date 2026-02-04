@@ -47,8 +47,44 @@ const EDUCATION_LABELS = {
 
 const MAX_TOTAL_BOOKINGS = 30
 
-const MIN_BOOKING_DATE = '2025-11-24'
-const MAX_BOOKING_DATE = '2025-12-05'
+// Load booking dates from config file or environment variables
+// Priority: ENV vars > config file > defaults
+function loadBookingDates() {
+  // Check environment variables first
+  if (process.env.MIN_BOOKING_DATE && process.env.MAX_BOOKING_DATE) {
+    return {
+      minDate: process.env.MIN_BOOKING_DATE,
+      maxDate: process.env.MAX_BOOKING_DATE
+    }
+  }
+
+  // Try to load from config file
+  try {
+    const configPath = path.join(__dirname, 'config', 'booking-dates.json')
+    const configData = require(configPath)
+    if (configData.minDate && configData.maxDate) {
+      console.log(`Booking dates loaded from config: ${configData.minDate} to ${configData.maxDate}`)
+      return {
+        minDate: configData.minDate,
+        maxDate: configData.maxDate
+      }
+    }
+  } catch (error) {
+    console.log('No config file found, using defaults')
+  }
+
+  // Fallback to defaults (update these as needed)
+  return {
+    minDate: '2026-03-01',
+    maxDate: '2026-03-15'
+  }
+}
+
+const BOOKING_DATES = loadBookingDates()
+const MIN_BOOKING_DATE = BOOKING_DATES.minDate
+const MAX_BOOKING_DATE = BOOKING_DATES.maxDate
+
+console.log(`Booking period: ${MIN_BOOKING_DATE} to ${MAX_BOOKING_DATE}`)
 
 function toDateOnlyString(date) {
   const normalized = new Date(date)
@@ -483,7 +519,7 @@ app.get('/', (req, res) => {
                     <h2>Wybierz datę</h2>
                     <div class="date-picker-container">
                         <div class="date-help" id="dateHelp">💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.</div>
-                      <input type="date" id="datePicker" required aria-describedby="dateHelp" min="2025-11-24" max="2025-12-05">
+                      <input type="date" id="datePicker" required aria-describedby="dateHelp" min="${MIN_BOOKING_DATE}" max="${MAX_BOOKING_DATE}">
                     </div>
                 </div>
                 

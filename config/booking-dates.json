@@ -1,0 +1,5 @@
+{
+  "minDate": "2026-03-01",
+  "maxDate": "2026-03-15",
+  "comment": "Update these dates for each booking period. Format: YYYY-MM-DD"
+}
