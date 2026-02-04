@@ -1,56 +1,24 @@
 const express = require('express')
 const fs = require('fs').promises
 const path = require('path')
-const { Resend } = require('resend')
 const { createEvents } = require('ics')
 
 const app = express()
 const port = 3000
 
-// Google Apps Script Web App URL for storing bookings
+// Google Apps Script Web App URL for storing bookings in Google Sheets
+// This handles: storage, email notifications, and calendar events
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || ''
+
+if (GOOGLE_SCRIPT_URL) {
+  console.log('Google Sheets integration enabled')
+} else {
+  console.log('Google Sheets integration disabled (set GOOGLE_SCRIPT_URL to enable)')
+  console.log('Using local file system for storage')
+}
 
 app.use(express.json())
 app.use(express.static('public'))
-
-// Try to use Vercel KV if environment variables are set
-let kv = null
-const useVercelKV = process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
-if (useVercelKV) {
-  try {
-    kv = require('@vercel/kv').kv
-    console.log('Using Vercel KV for storage')
-  } catch (error) {
-    console.log('Vercel KV not available, using file system')
-  }
-} else {
-  console.log('Using file system for local development (set KV_REST_API_URL and KV_REST_API_TOKEN to use Vercel KV)')
-}
-
-let resendClient = null
-const notificationSender = (process.env.NOTIFY_EMAIL_FROM || '').trim()
-const rawNotificationRecipients = (process.env.NOTIFY_EMAIL_TO || '')
-  .split(',')
-  .map(item => item.trim())
-  .filter(Boolean)
-
-const primaryNotificationRecipient = rawNotificationRecipients[0] || ''
-const notificationRecipients = primaryNotificationRecipient ? [primaryNotificationRecipient] : []
-
-if (rawNotificationRecipients.length > 1) {
-  console.warn('Wykryto wiele adresów w NOTIFY_EMAIL_TO. Tylko pierwszy zweryfikowany adres będzie użyty do wysyłki powiadomień.')
-}
-
-if (process.env.RESEND_API_KEY && notificationSender && notificationRecipients.length > 0) {
-  try {
-    resendClient = new Resend(process.env.RESEND_API_KEY)
-    console.log('Powiadomienia e-mail dla rezerwacji są włączone')
-  } catch (error) {
-    console.error('Nie udało się zainicjować Resend:', error)
-  }
-} else {
-  console.log('Powiadomienia e-mail są wyłączone (brak RESEND_API_KEY, NOTIFY_EMAIL_FROM lub NOTIFY_EMAIL_TO)')
-}
 
 const BOOKINGS_DIR = path.join(__dirname, 'bookings')
 const BOOKINGS_FILE = path.join(BOOKINGS_DIR, 'all-bookings.json')
@@ -120,151 +88,6 @@ function isValidEmail(value) {
   return emailRegex.test(trimmed)
 }
 
-async function sendBookingNotification(booking, replacedBooking) {
-  if (!resendClient || !notificationSender || notificationRecipients.length === 0) {
-    return
-  }
-
-  const dateDisplay = new Date(`${booking.date}T00:00:00`).toLocaleDateString('pl-PL', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-
-  const subject = replacedBooking
-    ? `Aktualizacja rezerwacji: ${dateDisplay} ${booking.timeSlot}`
-    : `Nowa rezerwacja: ${dateDisplay} ${booking.timeSlot}`
-
-  const statusLine = replacedBooking
-    ? 'Uwaga: ta rezerwacja zastąpiła istniejący wpis dla tego adresu e-mail.'
-    : 'Nowa rezerwacja została dodana do bazy.'
-
-  const educationLabel = booking.education && EDUCATION_LABELS[booking.education]
-    ? EDUCATION_LABELS[booking.education]
-    : (booking.education || '—')
-
-  const nativeLanguageRow = typeof booking.nativePolishSpeaker !== 'undefined'
-    ? `<tr>
-            <td style="font-weight: bold; padding-right: 16px;">Polski jako język ojczysty</td>
-            <td>${booking.nativePolishSpeaker ? 'Tak' : 'Nie'}</td>
-          </tr>`
-    : ''
-
-  const htmlBody = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-      <h2 style="margin-bottom: 12px;">${replacedBooking ? 'Aktualizacja rezerwacji' : 'Nowa rezerwacja'}</h2>
-      <p style="margin: 0 0 16px;">${statusLine}</p>
-      <table cellpadding="6" cellspacing="0" style="border-collapse: collapse;">
-        <tbody>
-          <tr>
-            <td style="font-weight: bold; padding-right: 16px;">Data</td>
-            <td>${dateDisplay}</td>
-          </tr>
-          <tr>
-            <td style="font-weight: bold; padding-right: 16px;">Godzina</td>
-            <td>${booking.timeSlot}</td>
-          </tr>
-          <tr>
-            <td style="font-weight: bold; padding-right: 16px;">Imię i nazwisko</td>
-            <td>${booking.name}</td>
-          </tr>
-          <tr>
-            <td style="font-weight: bold; padding-right: 16px;">Adres e-mail</td>
-            <td>${booking.email}</td>
-          </tr>
-          <tr>
-            <td style="font-weight: bold; padding-right: 16px;">Płeć</td>
-            <td>${booking.gender}</td>
-          </tr>
-          <tr>
-            <td style="font-weight: bold; padding-right: 16px;">Wiek</td>
-            <td>${booking.age}</td>
-          </tr>
-          <tr>
-            <td style="font-weight: bold; padding-right: 16px;">Wykształcenie</td>
-            <td>${educationLabel}</td>
-          </tr>
-          ${nativeLanguageRow}
-        </tbody>
-      </table>
-      <p style="margin-top: 16px; font-size: 13px; color: #555;">ID rezerwacji: ${booking.id}</p>
-      <p style="margin-top: 12px; font-size: 13px; color: #555;">W załączniku znajduje się plik kalendarza (ICS) dla tej rezerwacji.</p>
-    </div>
-  `
-
-  const textBody = `${statusLine}
-
-Data: ${dateDisplay}
-Godzina: ${booking.timeSlot}
-Imię i nazwisko: ${booking.name}
-Adres e-mail: ${booking.email}
-Płeć: ${booking.gender}
-Wiek: ${booking.age}
-ID rezerwacji: ${booking.id}
-
-Plik ICS z wpisem kalendarza znajduje się w załączniku.`
-
-  let attachments = []
-
-  try {
-    if (booking.date && booking.timeSlot) {
-      const [year, month, day] = booking.date.split('-').map(Number)
-      const [hour, minute] = booking.timeSlot.split(':').map(Number)
-
-      if (![year, month, day, hour, minute].some(Number.isNaN)) {
-        const summaryName = booking.name ? ` - ${booking.name}` : ''
-        const eventConfig = {
-          start: [year, month, day, hour, minute],
-          duration: { hours: 1 },
-          startInputType: 'local',
-          startOutputType: 'local',
-          title: `Badanie Lab SWPS${summaryName}`,
-          description: [
-            statusLine,
-            `Imię i nazwisko: ${booking.name || '-'}`,
-            `Adres e-mail: ${booking.email || '-'}`,
-            `Płeć: ${booking.gender || '-'}`,
-            `Wiek: ${typeof booking.age !== 'undefined' ? booking.age : '-'}`
-          ].join('\n'),
-          location: 'Lab SWPS',
-          productId: 'Lab SWPS Booking Calendar',
-          status: 'CONFIRMED',
-          calName: 'Rezerwacje Lab SWPS',
-          uid: `lab-swps-${booking.id}`
-        }
-
-        const { error: icsError, value: icsValue } = createEvents([eventConfig])
-
-        if (!icsError && icsValue) {
-          const sanitizedTime = booking.timeSlot.replace(/[^0-9]/g, '')
-          attachments.push({
-            filename: `rezerwacja-${booking.date}-${sanitizedTime || 'czas'}.ics`,
-            content: Buffer.from(icsValue, 'utf8').toString('base64')
-          })
-        } else if (icsError) {
-          console.error('Błąd generowania załącznika ICS:', icsError)
-        }
-      }
-    }
-  } catch (icsGenerationError) {
-    console.error('Błąd tworzenia załącznika ICS:', icsGenerationError)
-  }
-
-  try {
-    await resendClient.emails.send({
-      from: notificationSender,
-      to: notificationRecipients,
-      subject,
-      html: htmlBody,
-      text: textBody,
-      attachments: attachments.length > 0 ? attachments : undefined
-    })
-  } catch (error) {
-    console.error('Błąd wysyłania powiadomienia e-mail:', error)
-  }
-}
-
 async function ensureBookingsFile() {
   try {
     await fs.access(BOOKINGS_FILE)
@@ -305,29 +128,7 @@ async function sendToGoogleSheet(booking) {
 }
 
 async function loadBookings() {
-  // Use Vercel KV if available, otherwise fall back to file system
-  if (kv) {
-    try {
-      const allKeys = await kv.keys('booking:*')
-      if (!allKeys || allKeys.length === 0) {
-        return []
-      }
-      
-      const bookings = []
-      for (const key of allKeys) {
-        const booking = await kv.get(key)
-        if (booking) {
-          bookings.push(booking)
-        }
-      }
-      return bookings
-    } catch (error) {
-      console.error('Error loading from Vercel KV:', error)
-      return []
-    }
-  }
-
-  // File system fallback for local development
+  // Load from local file system (used as fallback/local dev)
   await ensureBookingsFile()
 
   const data = await fs.readFile(BOOKINGS_FILE, 'utf8')
@@ -369,21 +170,7 @@ async function loadBookings() {
 }
 
 async function saveBookings(bookings) {
-  // Use Vercel KV if available
-  if (kv) {
-    try {
-      // Save each booking with a unique key
-      for (const booking of bookings) {
-        await kv.set(`booking:${booking.id}`, booking)
-      }
-      return
-    } catch (error) {
-      console.error('Error saving to Vercel KV:', error)
-      throw error
-    }
-  }
-
-  // File system fallback for local development
+  // Save to local file system
   await fs.mkdir(BOOKINGS_DIR, { recursive: true })
   await fs.writeFile(BOOKINGS_FILE, `${JSON.stringify(bookings, null, 2)}\n`, 'utf8')
 }
@@ -1360,29 +1147,13 @@ app.post('/book', async (req, res) => {
       timestamp: new Date().toISOString()
     }
 
-    // Save the new booking
-    if (kv) {
-      // For Vercel KV, remove previous entry for this email (if any) and save directly
-      if (replacedBooking) {
-        try {
-          await kv.del(`booking:${replacedBooking.id}`)
-        } catch (error) {
-          console.error('Error removing previous booking from Vercel KV:', error)
-        }
-      }
-      await kv.set(`booking:${newBooking.id}`, newBooking)
-    } else {
-      // For file system, replace existing entry (if any) then save
-      const finalBookings = [...bookingsWithoutEmail, newBooking]
-      await saveBookings(finalBookings)
-    }
+    // Save locally (as backup)
+    const finalBookings = [...bookingsWithoutEmail, newBooking]
+    await saveBookings(finalBookings)
 
-    // Sync to Google Sheet (handles notifications + calendar)
+    // Sync to Google Sheet (handles storage, notifications + calendar)
     if (GOOGLE_SCRIPT_URL) {
       void sendToGoogleSheet(newBooking)
-    } else if (resendClient) {
-      // Fallback to Resend if Google Script not configured
-      void sendBookingNotification(newBooking, replacedBooking)
     }
 
     res.json({
