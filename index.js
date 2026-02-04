@@ -23,20 +23,48 @@ app.use(express.static('public'))
 const BOOKINGS_DIR = path.join(__dirname, 'bookings')
 const BOOKINGS_FILE = path.join(BOOKINGS_DIR, 'all-bookings.json')
 
-const ALL_TIME_SLOTS = [
-  '08:00',
-  '09:00',
-  '10:00',
-  '11:00',
-  '12:00',
-  '13:00',
-  '14:00',
-  '15:00',
-  '16:00',
-  '17:00',
-  '18:00',
-  '19:00'
-]
+// Load all booking configuration from JSON file
+function loadBookingConfig() {
+  try {
+    const configPath = path.join(__dirname, 'config', 'booking-dates.json')
+    // Clear require cache to get fresh config on each server restart
+    delete require.cache[require.resolve(configPath)]
+    const config = require(configPath)
+    return {
+      minDate: config.minDate || '2026-03-01',
+      maxDate: config.maxDate || '2026-03-15',
+      startHour: typeof config.startHour === 'number' ? config.startHour : 8,
+      endHour: typeof config.endHour === 'number' ? config.endHour : 19,
+      slotDurationMinutes: config.slotDurationMinutes || 60
+    }
+  } catch (error) {
+    console.error('Failed to load config/booking-dates.json:', error.message)
+    return {
+      minDate: '2026-03-01',
+      maxDate: '2026-03-15',
+      startHour: 8,
+      endHour: 19,
+      slotDurationMinutes: 60
+    }
+  }
+}
+
+// Generate time slots from config
+function generateTimeSlots(startHour, endHour) {
+  const slots = []
+  for (let hour = startHour; hour <= endHour; hour++) {
+    slots.push(`${hour.toString().padStart(2, '0')}:00`)
+  }
+  return slots
+}
+
+const BOOKING_CONFIG = loadBookingConfig()
+const MIN_BOOKING_DATE = BOOKING_CONFIG.minDate
+const MAX_BOOKING_DATE = BOOKING_CONFIG.maxDate
+const ALL_TIME_SLOTS = generateTimeSlots(BOOKING_CONFIG.startHour, BOOKING_CONFIG.endHour)
+
+console.log(`Booking period: ${MIN_BOOKING_DATE} to ${MAX_BOOKING_DATE}`)
+console.log(`Time slots: ${ALL_TIME_SLOTS[0]} - ${ALL_TIME_SLOTS[ALL_TIME_SLOTS.length - 1]} (${ALL_TIME_SLOTS.length} slots)`)
 
 const ALLOWED_EDUCATION_LEVELS = new Set(['higher', 'studies', 'other'])
 const EDUCATION_LABELS = {
@@ -46,45 +74,6 @@ const EDUCATION_LABELS = {
 }
 
 const MAX_TOTAL_BOOKINGS = 30
-
-// Load booking dates from config file or environment variables
-// Priority: ENV vars > config file > defaults
-function loadBookingDates() {
-  // Check environment variables first
-  if (process.env.MIN_BOOKING_DATE && process.env.MAX_BOOKING_DATE) {
-    return {
-      minDate: process.env.MIN_BOOKING_DATE,
-      maxDate: process.env.MAX_BOOKING_DATE
-    }
-  }
-
-  // Try to load from config file
-  try {
-    const configPath = path.join(__dirname, 'config', 'booking-dates.json')
-    const configData = require(configPath)
-    if (configData.minDate && configData.maxDate) {
-      console.log(`Booking dates loaded from config: ${configData.minDate} to ${configData.maxDate}`)
-      return {
-        minDate: configData.minDate,
-        maxDate: configData.maxDate
-      }
-    }
-  } catch (error) {
-    console.log('No config file found, using defaults')
-  }
-
-  // Fallback to defaults (update these as needed)
-  return {
-    minDate: '2026-03-01',
-    maxDate: '2026-03-15'
-  }
-}
-
-const BOOKING_DATES = loadBookingDates()
-const MIN_BOOKING_DATE = BOOKING_DATES.minDate
-const MAX_BOOKING_DATE = BOOKING_DATES.maxDate
-
-console.log(`Booking period: ${MIN_BOOKING_DATE} to ${MAX_BOOKING_DATE}`)
 
 function toDateOnlyString(date) {
   const normalized = new Date(date)
@@ -601,6 +590,7 @@ app.get('/', (req, res) => {
 
     <script>
         let availableSlots = [];
+        let allSlots = [];
         let selectedTimeSlot = null;
         let selectedDate = null;
 
@@ -665,6 +655,7 @@ app.get('/', (req, res) => {
 
                     selectedDate = data.date;
                     availableSlots = data.availableSlots || [];
+                    allSlots = data.allSlots || [];
 
                     if (datePicker) {
                         datePicker.min = data.minDate;
@@ -715,8 +706,6 @@ app.get('/', (req, res) => {
                 updateSubmitButtonState();
                 return;
             }
-
-            const allSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'];
 
             allSlots.forEach(slot => {
                 const slotDiv = document.createElement('div');
@@ -1005,6 +994,7 @@ app.get('/available-slots', async (req, res) => {
       date,
       minDate: bounds.minDate,
       maxDate: bounds.maxDate,
+      allSlots: ALL_TIME_SLOTS,
       availableSlots,
       bookedSlots
     })
