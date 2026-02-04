@@ -175,10 +175,11 @@ async function ensureBookingsFile() {
 async function sendToGoogleSheet(booking) {
   if (!GOOGLE_SCRIPT_URL) {
     console.log('Google Script URL not configured, skipping Google Sheet sync')
-    return null
+    return { success: false, error: 'GOOGLE_SCRIPT_URL not configured' }
   }
 
   try {
+    console.log('Fetching Google Script URL...')
     const response = await fetch(GOOGLE_SCRIPT_URL, {
       method: 'POST',
       headers: {
@@ -187,7 +188,25 @@ async function sendToGoogleSheet(booking) {
       body: JSON.stringify(booking)
     })
 
-    const result = await response.json()
+    console.log('Google Script response status:', response.status)
+    
+    // Google Apps Script may return HTML error page instead of JSON
+    const contentType = response.headers.get('content-type') || ''
+    const responseText = await response.text()
+    console.log('Google Script response (first 500 chars):', responseText.substring(0, 500))
+    
+    if (!contentType.includes('application/json')) {
+      console.error('Google Script returned non-JSON response:', contentType)
+      return { success: false, error: `Non-JSON response: ${contentType}`, rawResponse: responseText.substring(0, 200) }
+    }
+
+    let result
+    try {
+      result = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('Failed to parse Google Script response:', parseError)
+      return { success: false, error: 'Invalid JSON response', rawResponse: responseText.substring(0, 200) }
+    }
 
     if (result.success) {
       console.log('Booking synced to Google Sheet:', result.isUpdate ? 'updated' : 'new', result.bookingId)
@@ -197,8 +216,8 @@ async function sendToGoogleSheet(booking) {
 
     return result
   } catch (error) {
-    console.error('Error sending to Google Sheet:', error)
-    return null
+    console.error('Error sending to Google Sheet:', error.message)
+    return { success: false, error: error.message }
   }
 }
 
@@ -1270,13 +1289,27 @@ app.post('/book', async (req, res) => {
       timestamp: new Date().toISOString()
     }
 
-    // Save locally (as backup)
+    // Save locally (as backup) - this is a no-op on Vercel
     const finalBookings = [...bookingsWithoutEmail, newBooking]
     await saveBookings(finalBookings)
 
     // Sync to Google Sheet (handles storage, notifications + calendar)
+    let googleResult = null
     if (GOOGLE_SCRIPT_URL) {
-      void sendToGoogleSheet(newBooking)
+      console.log('Sending booking to Google Sheets...')
+      console.log('GOOGLE_SCRIPT_URL:', GOOGLE_SCRIPT_URL.substring(0, 50) + '...')
+      googleResult = await sendToGoogleSheet(newBooking)
+      console.log('Google Sheets result:', googleResult)
+      
+      if (!googleResult || !googleResult.success) {
+        console.error('Google Sheets sync failed:', googleResult)
+        return res.status(500).json({ 
+          error: 'Rezerwacja nie została zapisana w systemie. Spróbuj ponownie.',
+          debug: IS_VERCEL ? undefined : googleResult
+        })
+      }
+    } else {
+      console.warn('GOOGLE_SCRIPT_URL not configured - booking saved locally only')
     }
 
     res.json({
@@ -1285,7 +1318,8 @@ app.post('/book', async (req, res) => {
         ? 'Poprzednia rezerwacja została zastąpiona nowymi danymi.'
         : 'Rezerwacja została zapisana.',
       booking: newBooking,
-      replacedExistingBooking: Boolean(replacedBooking)
+      replacedExistingBooking: Boolean(replacedBooking),
+      googleSync: googleResult ? 'success' : 'skipped'
     })
 
     console.log('=== BOOKING REQUEST END (SUCCESS) ===')
