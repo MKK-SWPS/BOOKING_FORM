@@ -10,11 +10,18 @@ const port = 3000
 // This handles: storage, email notifications, and calendar events
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || ''
 
+// Detect if running on Vercel (read-only filesystem)
+const IS_VERCEL = process.env.VERCEL === '1'
+
 if (GOOGLE_SCRIPT_URL) {
   console.log('Google Sheets integration enabled')
 } else {
   console.log('Google Sheets integration disabled (set GOOGLE_SCRIPT_URL to enable)')
   console.log('Using local file system for storage')
+}
+
+if (IS_VERCEL) {
+  console.log('Running on Vercel (serverless, read-only filesystem)')
 }
 
 app.use(express.json())
@@ -196,7 +203,14 @@ async function sendToGoogleSheet(booking) {
 }
 
 async function loadBookings() {
-  // Load from local file system (used as fallback/local dev)
+  // On Vercel, we can't use local filesystem - return empty
+  // All real data is in Google Sheets
+  if (IS_VERCEL) {
+    console.log('Vercel environment: using Google Sheets as primary storage')
+    return []
+  }
+  
+  // Load from local file system (for local dev)
   await ensureBookingsFile()
 
   const data = await fs.readFile(BOOKINGS_FILE, 'utf8')
@@ -238,7 +252,13 @@ async function loadBookings() {
 }
 
 async function saveBookings(bookings) {
-  // Save to local file system
+  // Skip local file save on Vercel (read-only filesystem)
+  if (IS_VERCEL) {
+    console.log('Vercel environment detected, skipping local file save')
+    return
+  }
+  
+  // Save to local file system (for local dev)
   await fs.mkdir(BOOKINGS_DIR, { recursive: true })
   await fs.writeFile(BOOKINGS_FILE, `${JSON.stringify(bookings, null, 2)}\n`, 'utf8')
 }
@@ -1272,7 +1292,17 @@ app.post('/book', async (req, res) => {
   } catch (error) {
     console.error('=== BOOKING ERROR ===')
     console.error('Error creating booking:', error)
-    res.status(500).json({ error: 'Nie udało się zapisać rezerwacji' })
+    console.error('Error stack:', error.stack)
+    
+    // Include more details in dev/debug mode
+    const errorDetails = IS_VERCEL 
+      ? 'Nie udało się zapisać rezerwacji'
+      : `Nie udało się zapisać rezerwacji: ${error.message}`
+    
+    res.status(500).json({ 
+      error: errorDetails,
+      debug: IS_VERCEL ? undefined : { message: error.message, stack: error.stack }
+    })
   }
 })
 
