@@ -647,6 +647,13 @@ app.get('/', (req, res) => {
                         Język polski jest moim pierwszym / ojczystym językiem
                       </label>
                     </div>
+
+                    <div class="form-group checkbox-group">
+                      <label for="noMedicalConditions">
+                        <input type="checkbox" id="noMedicalConditions" name="noMedicalConditions" required>
+                        Nie mam padaczki fotogennej ani innych przeciwwskazań zdrowotnych do korzystania z komputera przez 30 minut
+                      </label>
+                    </div>
                 </div>
 
                   <div class="form-section">
@@ -993,6 +1000,12 @@ app.get('/', (req, res) => {
               return;
             }
 
+            const noMedicalConditionsCheckbox = document.getElementById('noMedicalConditions');
+            if (!noMedicalConditionsCheckbox || !noMedicalConditionsCheckbox.checked) {
+              showMessage('Potwierdź brak przeciwwskazań zdrowotnych do udziału w badaniu.', 'error');
+              return;
+            }
+
             submitButton.disabled = true;
             submitButton.textContent = 'Trwa rezerwacja...';
 
@@ -1007,7 +1020,8 @@ app.get('/', (req, res) => {
               gender: genderInput ? genderInput.value : '',
               age: Number.parseInt(ageValue, 10),
               education: educationSelect ? educationSelect.value : '',
-              nativePolishSpeaker: nativePolishCheckbox ? nativePolishCheckbox.checked : false
+              nativePolishSpeaker: nativePolishCheckbox ? nativePolishCheckbox.checked : false,
+              noMedicalConditions: noMedicalConditionsCheckbox ? noMedicalConditionsCheckbox.checked : false
             };
 
             try {
@@ -1041,6 +1055,9 @@ app.get('/', (req, res) => {
                     }
                     if (nativePolishCheckbox) {
                       nativePolishCheckbox.checked = false;
+                    }
+                    if (noMedicalConditionsCheckbox) {
+                      noMedicalConditionsCheckbox.checked = false;
                     }
                     if (consentCheckbox) {
                       consentCheckbox.checked = false;
@@ -1216,7 +1233,7 @@ app.post('/book', async (req, res) => {
   console.log('Incoming booking request received')
 
   try {
-    const { date, timeSlot, name, email, gender, age, education, nativePolishSpeaker } = req.body
+    const { date, timeSlot, name, email, gender, age, education, nativePolishSpeaker, noMedicalConditions } = req.body
 
     if (!date || !timeSlot || !name || !email || !gender || !education || (typeof age === 'undefined' || age === null)) {
       return res.status(400).json({ error: 'Wszystkie pola są wymagane' })
@@ -1248,6 +1265,10 @@ app.post('/book', async (req, res) => {
 
     if (!nativePolishSpeaker) {
       return res.status(400).json({ error: 'Rezerwacja dostępna wyłącznie dla osób, dla których polski jest językiem ojczystym.' })
+    }
+
+    if (!noMedicalConditions) {
+      return res.status(400).json({ error: 'Wymagane jest potwierdzenie braku przeciwwskazań zdrowotnych.' })
     }
 
     const bookings = await loadBookings()
@@ -1286,6 +1307,7 @@ app.post('/book', async (req, res) => {
       age: parsedAge,
       education,
       nativePolishSpeaker: Boolean(nativePolishSpeaker),
+      noMedicalConditions: Boolean(noMedicalConditions),
       timestamp: new Date().toISOString()
     }
 
