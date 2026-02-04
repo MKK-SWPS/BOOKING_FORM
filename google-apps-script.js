@@ -252,19 +252,31 @@ function createCalendarEvent(data) {
   };
   
   const description = [
+    'Dziękujemy za zapisanie się na badanie w Lab SWPS!',
+    '',
     'Imię i nazwisko: ' + data.name,
     'Email: ' + data.email,
     'Płeć: ' + (genderLabels[data.gender] || data.gender),
     'Wiek: ' + data.age,
     'Wykształcenie: ' + (educationLabels[data.education] || data.education),
     '',
+    'Jeśli potrzebujesz zmienić termin, wejdź ponownie na stronę rejestracji',
+    'i zapisz się używając tego samego adresu e-mail.',
+    '',
+    'Do zobaczenia!',
+    'Zespół Lab SWPS',
+    '',
     'ID: ' + data.id
   ].join('\n');
   
   const event = calendar.createEvent(title, startTime, endTime, {
     description: description,
-    location: 'Lab SWPS'
+    location: 'Lab SWPS',
+    guests: data.email,
+    sendInvites: true
   });
+  
+  console.log('Calendar event created with guest: ' + data.email);
   
   return event.getId();
 }
@@ -363,8 +375,7 @@ function sendNotificationEmail(data, isUpdate, oldDate, oldTimeSlot) {
     }
   });
   
-  // Send confirmation to the person who booked
-  sendBookerConfirmation(data, isUpdate, dateDisplay);
+  // Note: Booker receives calendar invitation automatically (sendInvites: true in createCalendarEvent)
 }
 
 // ============ TEST FUNCTION ============
@@ -384,74 +395,4 @@ function testProcessBooking() {
   
   const result = processBooking(testData);
   console.log('Test result:', result);
-}
-
-// Send confirmation email to the person who made the booking
-function sendBookerConfirmation(data, isUpdate, dateDisplay) {
-  if (!data.email) {
-    return;
-  }
-  
-  const subject = isUpdate 
-    ? 'Potwierdzenie zmiany rezerwacji - Lab SWPS'
-    : 'Potwierdzenie rezerwacji - Lab SWPS';
-  
-  const greeting = data.name ? ('Cześć ' + data.name.split(' ')[0] + '!') : 'Cześć!';
-  
-  const body = [
-    greeting,
-    '',
-    isUpdate 
-      ? 'Twoja rezerwacja została zaktualizowana.'
-      : 'Dziękujemy za zapisanie się na badanie w Lab SWPS!',
-    '',
-    'Szczegóły wizyty:',
-    '📅 Data: ' + dateDisplay,
-    '🕐 Godzina: ' + data.timeSlot,
-    '📍 Miejsce: Lab SWPS',
-    '',
-    'Jeśli potrzebujesz zmienić termin, wejdź ponownie na stronę rejestracji i zapisz się używając tego samego adresu e-mail.',
-    '',
-    'Do zobaczenia!',
-    'Zespół Lab SWPS',
-    '',
-    '---',
-    'ID rezerwacji: ' + data.id
-  ].join('\n');
-  
-  const htmlBody = [
-    '<div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">',
-    '<div style="background-color: #007aff; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">',
-    '<h1 style="margin: 0;">📅 Lab SWPS</h1>',
-    '</div>',
-    '<div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">',
-    '<h2 style="color: #333;">' + greeting + '</h2>',
-    '<p style="color: #555;">' + (isUpdate ? 'Twoja rezerwacja została zaktualizowana.' : 'Dziękujemy za zapisanie się na badanie w Lab SWPS!') + '</p>',
-    '<div style="background-color: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #007aff;">',
-    '<h3 style="margin-top: 0; color: #007aff;">Szczegóły wizyty</h3>',
-    '<p style="margin: 10px 0;"><strong>📅 Data:</strong> ' + dateDisplay + '</p>',
-    '<p style="margin: 10px 0;"><strong>🕐 Godzina:</strong> ' + data.timeSlot + '</p>',
-    '<p style="margin: 10px 0;"><strong>📍 Miejsce:</strong> Lab SWPS</p>',
-    '</div>',
-    '<p style="color: #666; font-size: 14px;">Jeśli potrzebujesz zmienić termin, wejdź ponownie na stronę rejestracji i zapisz się używając tego samego adresu e-mail.</p>',
-    '<p style="color: #333; margin-top: 30px;">Do zobaczenia!<br><strong>Zespół Lab SWPS</strong></p>',
-    '<hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">',
-    '<p style="color: #999; font-size: 12px;">ID rezerwacji: ' + data.id + '</p>',
-    '</div>',
-    '</div>'
-  ].join('\n');
-  
-  try {
-    MailApp.sendEmail({
-      to: data.email,
-      subject: subject,
-      body: body,
-      htmlBody: htmlBody,
-      replyTo: 'eyelab@swps.edu.pl',
-      name: 'Lab SWPS'
-    });
-    console.log('Confirmation email sent to: ' + data.email);
-  } catch (error) {
-    console.error('Failed to send confirmation to booker:', error);
-  }
 }
