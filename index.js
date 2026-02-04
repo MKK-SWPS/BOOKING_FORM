@@ -23,48 +23,87 @@ app.use(express.static('public'))
 const BOOKINGS_DIR = path.join(__dirname, 'bookings')
 const BOOKINGS_FILE = path.join(BOOKINGS_DIR, 'all-bookings.json')
 
-// Load all booking configuration from JSON file
+// Load booking configuration from JSON file
+// Format: { "days": [{ "date": "2026-03-02", "startHour": 9, "endHour": 17 }, ...] }
 function loadBookingConfig() {
   try {
     const configPath = path.join(__dirname, 'config', 'booking-dates.json')
-    // Clear require cache to get fresh config on each server restart
     delete require.cache[require.resolve(configPath)]
     const config = require(configPath)
-    return {
-      minDate: config.minDate || '2026-03-01',
-      maxDate: config.maxDate || '2026-03-15',
-      startHour: typeof config.startHour === 'number' ? config.startHour : 8,
-      endHour: typeof config.endHour === 'number' ? config.endHour : 19,
-      slotDurationMinutes: config.slotDurationMinutes || 60
+    
+    if (config.days && Array.isArray(config.days) && config.days.length > 0) {
+      // New format: list of days with per-day hours
+      const sortedDays = [...config.days].sort((a, b) => a.date.localeCompare(b.date))
+      return {
+        days: sortedDays,
+        minDate: sortedDays[0].date,
+        maxDate: sortedDays[sortedDays.length - 1].date
+      }
     }
+    
+    // Fallback for old format or missing config
+    console.warn('Config missing "days" array, using defaults')
+    return getDefaultConfig()
   } catch (error) {
     console.error('Failed to load config/booking-dates.json:', error.message)
-    return {
-      minDate: '2026-03-01',
-      maxDate: '2026-03-15',
-      startHour: 8,
-      endHour: 19,
-      slotDurationMinutes: 60
-    }
+    return getDefaultConfig()
   }
 }
 
-// Generate time slots from config
-function generateTimeSlots(startHour, endHour) {
+function getDefaultConfig() {
+  return {
+    days: [
+      { date: '2026-03-02', startHour: 9, endHour: 17 },
+      { date: '2026-03-03', startHour: 9, endHour: 17 }
+    ],
+    minDate: '2026-03-02',
+    maxDate: '2026-03-03'
+  }
+}
+
+// Generate time slots for a specific day
+function generateTimeSlotsForDay(dayConfig) {
+  if (!dayConfig) return []
   const slots = []
+  const startHour = typeof dayConfig.startHour === 'number' ? dayConfig.startHour : 9
+  const endHour = typeof dayConfig.endHour === 'number' ? dayConfig.endHour : 17
   for (let hour = startHour; hour <= endHour; hour++) {
     slots.push(`${hour.toString().padStart(2, '0')}:00`)
   }
   return slots
 }
 
+// Get day config for a specific date
+function getDayConfig(dateStr) {
+  const dayConfig = BOOKING_CONFIG.days.find(d => d.date === dateStr)
+  return dayConfig || null
+}
+
+// Get all time slots for a specific date
+function getTimeSlotsForDate(dateStr) {
+  const dayConfig = getDayConfig(dateStr)
+  return generateTimeSlotsForDay(dayConfig)
+}
+
+// Check if a date is valid (exists in config)
+function isConfiguredDate(dateStr) {
+  return BOOKING_CONFIG.days.some(d => d.date === dateStr)
+}
+
+// Get list of all configured dates
+function getConfiguredDates() {
+  return BOOKING_CONFIG.days.map(d => d.date)
+}
+
 const BOOKING_CONFIG = loadBookingConfig()
 const MIN_BOOKING_DATE = BOOKING_CONFIG.minDate
 const MAX_BOOKING_DATE = BOOKING_CONFIG.maxDate
-const ALL_TIME_SLOTS = generateTimeSlots(BOOKING_CONFIG.startHour, BOOKING_CONFIG.endHour)
 
 console.log(`Booking period: ${MIN_BOOKING_DATE} to ${MAX_BOOKING_DATE}`)
-console.log(`Time slots: ${ALL_TIME_SLOTS[0]} - ${ALL_TIME_SLOTS[ALL_TIME_SLOTS.length - 1]} (${ALL_TIME_SLOTS.length} slots)`)
+console.log(`Configured days: ${BOOKING_CONFIG.days.length}`)
+BOOKING_CONFIG.days.forEach(d => {
+  console.log(`  ${d.date}: ${d.startHour}:00 - ${d.endHour}:00`)
+})
 
 const ALLOWED_EDUCATION_LEVELS = new Set(['higher', 'studies', 'other'])
 const EDUCATION_LABELS = {
@@ -82,7 +121,11 @@ function toDateOnlyString(date) {
 }
 
 function getDateBounds() {
-  return { minDate: MIN_BOOKING_DATE, maxDate: MAX_BOOKING_DATE }
+  const dates = getConfiguredDates()
+  if (dates.length === 0) {
+    return { minDate: null, maxDate: null }
+  }
+  return { minDate: dates[0], maxDate: dates[dates.length - 1] }
 }
 
 function isValidBookingDate(dateStr) {
@@ -95,8 +138,8 @@ function isValidBookingDate(dateStr) {
     return false
   }
 
-  const { minDate, maxDate } = getDateBounds()
-  return dateStr >= minDate && dateStr <= maxDate
+  // Check if date is in our configured days
+  return isConfiguredDate(dateStr)
 }
 
 function normalizeEmail(value) {
@@ -591,6 +634,7 @@ app.get('/', (req, res) => {
     <script>
         let availableSlots = [];
         let allSlots = [];
+        let configuredDates = [];
         let selectedTimeSlot = null;
         let selectedDate = null;
 
@@ -656,6 +700,7 @@ app.get('/', (req, res) => {
                     selectedDate = data.date;
                     availableSlots = data.availableSlots || [];
                     allSlots = data.allSlots || [];
+                    configuredDates = data.configuredDates || [];
 
                     if (datePicker) {
                         datePicker.min = data.minDate;
@@ -664,7 +709,10 @@ app.get('/', (req, res) => {
                     }
 
                     if (dateHelp) {
-                      dateHelp.textContent = '💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.';
+                        const datesInfo = configuredDates.length > 0 
+                            ? 'Dostępne dni: ' + configuredDates.map(d => formatDateForDisplay(d)).join(', ')
+                            : '💡 Kliknij ikonę kalendarza po prawej stronie, aby wybrać datę.';
+                        dateHelp.textContent = datesInfo;
                     }
 
                     renderTimeSlots();
@@ -839,6 +887,16 @@ app.get('/', (req, res) => {
         if (datePickerElement) {
             datePickerElement.addEventListener('change', function (e) {
                 const newDate = e.target.value;
+                // Validate the selected date is in the configured dates list
+                if (configuredDates.length > 0 && !configuredDates.includes(newDate)) {
+                    showMessage('Wybrany dzień nie jest dostępny. Dostępne dni: ' + configuredDates.map(d => formatDateForDisplay(d)).join(', '), 'error');
+                    // Reset to a valid date
+                    if (configuredDates.length > 0) {
+                        e.target.value = configuredDates[0];
+                        loadAvailableSlots(configuredDates[0]);
+                    }
+                    return;
+                }
                 loadAvailableSlots(newDate);
             });
         }
@@ -977,8 +1035,17 @@ app.get('/', (req, res) => {
 app.get('/available-slots', async (req, res) => {
   try {
     const bounds = getDateBounds()
+    const configuredDates = getConfiguredDates()
+    
+    if (configuredDates.length === 0) {
+      return res.status(500).json({ error: 'Brak skonfigurowanych dat rezerwacji' })
+    }
+    
     const requestedDate = typeof req.query.date === 'string' ? req.query.date : ''
     const date = isValidBookingDate(requestedDate) ? requestedDate : bounds.minDate
+
+    // Get time slots specific to this date
+    const allSlotsForDate = getTimeSlotsForDate(date)
 
     const bookings = await loadBookings()
     const bookedSlots = bookings
@@ -988,13 +1055,14 @@ app.get('/available-slots', async (req, res) => {
       })
       .map(booking => booking.timeSlot)
 
-    const availableSlots = ALL_TIME_SLOTS.filter(slot => !bookedSlots.includes(slot))
+    const availableSlots = allSlotsForDate.filter(slot => !bookedSlots.includes(slot))
 
     res.json({
       date,
       minDate: bounds.minDate,
       maxDate: bounds.maxDate,
-      allSlots: ALL_TIME_SLOTS,
+      configuredDates,
+      allSlots: allSlotsForDate,
       availableSlots,
       bookedSlots
     })
@@ -1112,8 +1180,10 @@ app.post('/book', async (req, res) => {
       return res.status(400).json({ error: 'Nieprawidłowa data rezerwacji' })
     }
 
-    if (!ALL_TIME_SLOTS.includes(timeSlot)) {
-      return res.status(400).json({ error: 'Nieprawidłowy termin' })
+    // Check if time slot is valid for this specific date
+    const validSlotsForDate = getTimeSlotsForDate(date)
+    if (!validSlotsForDate.includes(timeSlot)) {
+      return res.status(400).json({ error: 'Nieprawidłowy termin dla wybranej daty' })
     }
 
     const trimmedEmail = typeof email === 'string' ? email.trim() : ''

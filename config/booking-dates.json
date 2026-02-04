@@ -1,8 +1,10 @@
 {
-  "minDate": "2026-03-01",
-  "maxDate": "2026-03-15",
-  "startHour": 8,
-  "endHour": 19,
-  "slotDurationMinutes": 60,
-  "comment": "Update these for each booking period. Dates: YYYY-MM-DD. Hours: 0-23."
+  "days": [
+    { "date": "2026-03-02", "startHour": 9, "endHour": 17 },
+    { "date": "2026-03-03", "startHour": 9, "endHour": 17 },
+    { "date": "2026-03-04", "startHour": 10, "endHour": 18 },
+    { "date": "2026-03-05", "startHour": 9, "endHour": 17 },
+    { "date": "2026-03-06", "startHour": 9, "endHour": 15 }
+  ],
+  "comment": "Each day has its own hours. Dates: YYYY-MM-DD. Hours: 0-23 (startHour to endHour inclusive)."
 }
