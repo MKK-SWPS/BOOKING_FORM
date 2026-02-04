@@ -950,7 +950,7 @@ app.get('/', (req, res) => {
           targetArea.innerHTML = '';
           targetArea.appendChild(messageDiv);
 
-          if (type !== 'success') {
+          if (type === 'error') {
             setTimeout(function () {
               if (messageDiv.parentElement === targetArea) {
                 messageDiv.remove();
