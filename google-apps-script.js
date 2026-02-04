@@ -347,14 +347,25 @@ function sendNotificationEmail(data, isUpdate, oldDate, oldTimeSlot) {
     '</div>'
   ].join('\n');
   
-  // Send to lab notification emails
+  // Send to lab notification emails (from eyelab alias if available)
+  const aliases = GmailApp.getAliases();
+  const eyelabAlias = aliases.find(function(a) { return a.toLowerCase() === 'eyelab@swps.edu.pl'; });
+  
   NOTIFY_EMAILS.forEach(function(emailAddr) {
-    MailApp.sendEmail({
-      to: emailAddr,
-      subject: subject,
-      body: body,
-      htmlBody: htmlBody
-    });
+    if (eyelabAlias) {
+      GmailApp.sendEmail(emailAddr, subject, body, {
+        htmlBody: htmlBody,
+        from: eyelabAlias,
+        name: 'Lab SWPS'
+      });
+    } else {
+      MailApp.sendEmail({
+        to: emailAddr,
+        subject: subject,
+        body: body,
+        htmlBody: htmlBody
+      });
+    }
   });
   
   // Send confirmation to the person who booked
@@ -438,7 +449,9 @@ function sendBookerConfirmation(data, isUpdate, dateDisplay) {
   try {
     // Try to send from eyelab@swps.edu.pl alias if available
     const aliases = GmailApp.getAliases();
-    const eyelabAlias = aliases.find(a => a.toLowerCase() === 'eyelab@swps.edu.pl');
+    const eyelabAlias = aliases.find(function(a) { return a.toLowerCase() === 'eyelab@swps.edu.pl'; });
+    console.log('Available aliases:', aliases);
+    console.log('Found eyelab alias:', eyelabAlias);
     
     if (eyelabAlias) {
       GmailApp.sendEmail(data.email, subject, body, {
@@ -446,8 +459,10 @@ function sendBookerConfirmation(data, isUpdate, dateDisplay) {
         from: eyelabAlias,
         name: 'Lab SWPS'
       });
+      console.log('Sent from eyelab alias');
     } else {
       // Fallback: send from default account with replyTo
+      console.log('Alias not found, using fallback with replyTo');
       MailApp.sendEmail({
         to: data.email,
         subject: subject,

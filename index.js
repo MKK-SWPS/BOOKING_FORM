@@ -597,6 +597,12 @@ app.get('/', (req, res) => {
             color: white;
         }
         
+        .message.info {
+            background-color: #3a3a3c;
+            color: #e5e5e5;
+            border: 1px solid #555;
+        }
+        
         .loading {
             text-align: center;
             color: #999;
@@ -1099,6 +1105,7 @@ app.get('/', (req, res) => {
 
             submitButton.disabled = true;
             submitButton.textContent = 'Trwa rezerwacja...';
+            showMessage('Poczekaj chwilę — nie zamykaj ani nie odświeżaj strony.', 'info');
 
             const reservedTime = selectedTimeSlot;
             const reservedDate = selectedDate;
