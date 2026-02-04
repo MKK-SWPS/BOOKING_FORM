@@ -1047,7 +1047,14 @@ app.get('/available-slots', async (req, res) => {
     // Get time slots specific to this date
     const allSlotsForDate = getTimeSlotsForDate(date)
 
-    const bookings = await loadBookings()
+    let bookings = []
+    try {
+      bookings = await loadBookings()
+    } catch (loadError) {
+      console.error('Error loading bookings for available slots:', loadError)
+      bookings = []
+    }
+
     const bookedSlots = bookings
       .filter(booking => {
         const bookingDate = booking.date || (booking.timestamp ? toDateOnlyString(new Date(booking.timestamp)) : null)
